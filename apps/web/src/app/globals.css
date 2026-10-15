@@ -3,18 +3,41 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-white text-slate-900 antialiased;
 }
 
-.btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50;
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50;
+  }
+  .btn-soft {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-surface px-4 py-2.5 text-sm font-medium text-slate-800 transition hover:bg-slate-200;
+  }
+  .input {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100;
+  }
+  .card {
+    @apply rounded-2xl border border-slate-200/80 bg-white;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-surface px-3.5 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200;
+  }
+  .chip-active {
+    @apply bg-slate-900 text-white hover:bg-slate-800;
+  }
+  .section-title {
+    @apply text-xl font-bold tracking-tight sm:text-2xl;
+  }
 }
-.btn-ghost {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50;
-}
-.input {
-  @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100;
-}
-.card {
-  @apply rounded-2xl border border-slate-200 bg-white;
+
+@layer utilities {
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }

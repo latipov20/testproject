@@ -21,7 +21,19 @@ export interface ProductCard {
   inStock: boolean;
   isNew: boolean;
   isTrending: boolean;
+  variantId: number | null;
+  variantCount: number;
 }
+
+export interface ProductPage {
+  items: ProductCard[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export const discountPercent = (price: number, oldPrice: number | null) =>
+  oldPrice && oldPrice > price ? Math.round((1 - price / oldPrice) * 100) : 0;
 
 export interface Category {
   id: number;

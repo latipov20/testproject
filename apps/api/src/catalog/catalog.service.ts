@@ -8,6 +8,7 @@ export interface ProductQuery {
   animal?: string;
   q?: string;
   tag?: 'new' | 'trending';
+  ids?: string;
   sort?: 'new' | 'price_asc' | 'price_desc';
   page?: number;
   limit?: number;
@@ -56,6 +57,7 @@ export class CatalogService {
       const ids = await this.categoryWithDescendants(query.category);
       where.categoryId = { in: ids };
     }
+    if (query.ids) where.id = { in: query.ids.split(',').map(Number) };
     if (query.tag === 'new') where.isNew = true;
     if (query.tag === 'trending') where.isTrending = true;
     if (query.animal) where.animalTypes = { some: { slug: query.animal } };
@@ -146,6 +148,9 @@ export class CatalogService {
       price: cheapest?.price ?? 0,
       oldPrice: cheapest?.oldPrice ?? null,
       packSize: cheapest?.packSize ?? '',
+      // Kartochkadagi "Savatga" tugmasi eng arzon qadoqni qo'shadi.
+      variantId: cheapest?.id ?? null,
+      variantCount: p.variants.length,
       isNew: p.isNew,
       isTrending: p.isTrending,
       variantIds: p.variants.map((v) => v.id),

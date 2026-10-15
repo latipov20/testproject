@@ -5,6 +5,7 @@ import { useAuthed } from '@/components/useAuthed';
 import { api } from '@/lib/client';
 import { price } from '@/lib/format';
 import { dict, type Locale } from '@/lib/i18n';
+import { refreshShop } from '@/lib/shop';
 
 interface Zone {
   id: number;
@@ -50,6 +51,7 @@ export default function CheckoutPage() {
         method: 'POST',
         body: { addressId: address.id, paymentMethod: form.paymentMethod, comment: form.comment || undefined },
       });
+      refreshShop();
       if (form.paymentMethod !== 'CASH') {
         const { url } = await api(`/payments/${order.id}/init`, { method: 'POST', body: {} });
         location.href = url;

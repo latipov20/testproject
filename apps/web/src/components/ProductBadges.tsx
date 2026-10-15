@@ -4,8 +4,8 @@ export function ProductBadges({ isNew, isTrending, t, className = '' }: { isNew:
   if (!isNew && !isTrending) return null;
   return (
     <span className={`flex flex-wrap gap-1 ${className}`}>
-      {isTrending && <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white">{t.badgeTrending}</span>}
-      {isNew && <span className="rounded-full bg-brand-600 px-2 py-0.5 text-xs font-semibold text-white">{t.badgeNew}</span>}
+      {isTrending && <span className="rounded-lg bg-amber-400 px-1.5 py-0.5 text-[11px] font-bold text-amber-950">🔥 {t.badgeTrending}</span>}
+      {isNew && <span className="rounded-lg bg-brand-600 px-1.5 py-0.5 text-[11px] font-bold text-white">{t.badgeNew}</span>}
     </span>
   );
 }

@@ -1,6 +1,6 @@
 import { Controller, Get, Headers, Param, Query } from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 import { langFrom } from '../common/i18n';
 import { CatalogService } from './catalog.service';
 
@@ -9,6 +9,8 @@ class ProductQueryDto {
   @IsOptional() @IsString() animal?: string;
   @IsOptional() @IsString() q?: string;
   @IsOptional() @IsIn(['new', 'trending']) tag?: 'new' | 'trending';
+  // Sevimlilar sahifasi uchun: vergul bilan ajratilgan mahsulot id'lari.
+  @IsOptional() @Matches(/^\d+(,\d+){0,59}$/) ids?: string;
   @IsOptional() @IsIn(['new', 'price_asc', 'price_desc']) sort?: 'new' | 'price_asc' | 'price_desc';
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(60) limit?: number;

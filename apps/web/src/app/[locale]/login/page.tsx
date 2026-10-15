@@ -40,13 +40,14 @@ function LoginForm() {
       const p = phone.replace(/\s/g, '');
       const res = await api('/auth/otp/verify', { method: 'POST', body: { phone: p, code } });
       setSession({ accessToken: res.accessToken, refreshToken: res.refreshToken, role: res.user.role, phone: p });
-      router.push(res.user.role === 'COURIER' ? `/${locale}/courier` : res.user.role === 'CUSTOMER' ? next : `/${locale}/staff`);
+      const home = { COURIER: 'courier', ADMIN: 'admin', OPERATOR: 'staff' }[res.user.role as string];
+      router.push(home ? `/${locale}/${home}` : next);
     });
 
   return (
-    <div className="mx-auto max-w-sm">
-      <div className="card flex flex-col gap-4 p-6">
-        <h1 className="text-xl font-bold">{t.login}</h1>
+    <div className="mx-auto max-w-sm py-6">
+      <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-card sm:p-8">
+        <h1 className="text-2xl font-extrabold tracking-tight">{t.login}</h1>
         <label className="flex flex-col gap-1 text-sm">
           {t.phone}
           <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" disabled={step === 'code'} />
