@@ -5,8 +5,9 @@ import { apiGet, type Category } from '@/lib/api';
 import { dict, type Locale } from '@/lib/i18n';
 
 // Xaridorlar uchun do'kon: header, footer, telefon uchun pastki menyu.
-export default async function ShopLayout({ children, params }: { children: React.ReactNode; params: Promise<{ locale: Locale }> }) {
-  const { locale } = await params;
+// Til ildiz layout'da tekshirilgan (isLocale), shu yerga faqat uz/ru keladi.
+export default async function ShopLayout({ children, params }: { children: React.ReactNode; params: Promise<{ locale: string }> }) {
+  const locale = (await params).locale as Locale;
   const t = dict(locale);
   // API vaqtincha ishlamasa ham sahifa ochilsin: menyu bo'sh qoladi.
   const categories = await apiGet<Category[]>('/categories', locale).catch(() => [] as Category[]);
