@@ -35,8 +35,8 @@ export default async function Home({ params }: { params: Promise<{ locale: Local
     apiGet<Named[]>('/animal-types', locale),
     apiGet<Banner[]>('/banners', locale).catch(() => [] as Banner[]),
     apiGet<ProductPage>('/products?limit=20', locale),
-    apiGet<ProductPage>('/products?tag=trending&limit=10', locale),
-    apiGet<ProductPage>('/products?tag=new&limit=10', locale),
+    apiGet<ProductPage>('/products?tag=trending&limit=15', locale),
+    apiGet<ProductPage>('/products?tag=new&limit=15', locale),
   ]);
 
   // Admin banner qo'shgan bo'lsa, ular birinchi chiqadi; standart slaydlar doim qoladi.

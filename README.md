@@ -21,6 +21,7 @@ cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 pnpm --filter api exec prisma migrate deploy
 pnpm db:seed                         # kategoriyalar, 14 hudud, namuna mahsulotlar, xodimlar
+pnpm db:demo                         # demo katalog: subkategoriyalar, ~40 mahsulot, rasmlar (uploads/demo), qoldiq
 pnpm dev:api                         # http://localhost:4000/v1, hujjat: http://localhost:4000/docs
 pnpm dev:web                         # http://localhost:3000
 ```
