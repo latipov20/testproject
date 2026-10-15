@@ -45,14 +45,23 @@ class CourierController {
             total: true,
             paymentMethod: true,
             comment: true,
-            user: { select: { phone: true, name: true } },
+            createdAt: true,
+            // Qabul qiluvchi: Telegram orqali tasdiqlangan raqam va ism.
+            user: { select: { phone: true, name: true, telegramUsername: true } },
             address: { include: { zone: true } },
             items: { select: { title: true, qty: true } },
+            payments: { where: { state: 'PAID' }, select: { provider: true } },
           },
         },
       },
       orderBy: { createdAt: 'asc' },
     });
+  }
+
+  @Get('me')
+  async profile(@CurrentUser() user: AuthUser) {
+    const courier = await this.me(user);
+    return { id: courier.id, status: courier.status, zoneId: courier.zoneId };
   }
 
   @Post('status')

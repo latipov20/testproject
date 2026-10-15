@@ -12,15 +12,7 @@ export function MobileNav({ locale, t }: { locale: Locale; t: Dict }) {
   const session = useSession();
   const { cartCount, favorites } = useShop();
 
-  const cabinet = !session
-    ? `/${locale}/login`
-    : session.role === 'CUSTOMER'
-      ? `/${locale}/orders`
-      : session.role === 'COURIER'
-        ? `/${locale}/courier`
-        : session.role === 'ADMIN'
-          ? `/${locale}/admin`
-          : `/${locale}/staff`;
+  const cabinet = `/${locale}/${session ? 'cabinet' : 'login'}`;
 
   const items = [
     { href: `/${locale}`, icon: Home, label: t.home, exact: true },

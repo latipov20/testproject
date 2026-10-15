@@ -1,240 +1,172 @@
 'use client';
-import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CategoryManager } from '@/components/admin/CategoryManager';
-import { ProductForm } from '@/components/admin/ProductForm';
-import { AdminCategory, AdminProduct, ProductStatus, STATUS_LABEL, toInput, toPayload } from '@/components/admin/types';
-import { ProductImage } from '@/components/ProductImage';
-import { useAuthed } from '@/components/useAuthed';
-import type { Named } from '@/lib/api';
+import { useCallback, useEffect, useState } from 'react';
+import { StatusBadge } from '@/components/StatusBadge';
 import { api } from '@/lib/client';
-import { price } from '@/lib/format';
-import { dict, type Locale } from '@/lib/i18n';
+import { date, price } from '@/lib/format';
+import { dict } from '@/lib/i18n';
 
-// Admin paneli: mahsulotlar (narx, rasm, tavsif, uz/ru matnlar, yangi/trend belgilari) va kategoriyalar.
-const TABS = { products: 'Mahsulotlar', categories: 'Kategoriyalar' } as const;
-type Tab = keyof typeof TABS;
-type Filter = 'all' | ProductStatus | 'new' | 'trending';
+// Buyurtmalar: tasdiqlash, yig'ish, kuryerga biriktirish, bekor qilish.
+interface Order {
+  id: number;
+  status: string;
+  total: number;
+  paymentMethod: string;
+  createdAt: string;
+  comment: string | null;
+  user: { phone: string; name: string | null; telegramUsername: string | null };
+  address: { street: string; landmark: string | null; zone: { regionUz: string } };
+  items: { id: number; title: string; qty: number; price: number; batch: { batchNo: string; expiryDate: string } }[];
+  payments: { state: string }[];
+  delivery: { status: string; courier: { user: { name: string | null; phone: string } } } | null;
+}
 
-const STATUS_STYLE: Record<ProductStatus, string> = {
-  ACTIVE: 'bg-brand-50 text-brand-700',
-  DRAFT: 'bg-slate-100 text-slate-600',
-  ARCHIVED: 'bg-red-50 text-red-700',
-};
+interface Courier {
+  id: number;
+  status: string;
+  user: { name: string | null; phone: string };
+  zone: { regionUz: string } | null;
+  _count: { deliveries: number };
+}
 
-export default function AdminPage() {
-  const { locale } = useParams<{ locale: Locale }>();
-  const t = dict(locale);
-  const session = useAuthed();
-  const [tab, setTab] = useState<Tab>('products');
-  const [products, setProducts] = useState<AdminProduct[]>([]);
-  const [categories, setCategories] = useState<AdminCategory[]>([]);
-  const [animals, setAnimals] = useState<Named[]>([]);
-  const [editing, setEditing] = useState<AdminProduct | 'new' | null>(null);
-  const [q, setQ] = useState('');
-  const [filter, setFilter] = useState<Filter>('all');
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+const STATUSES = ['NEW', 'CONFIRMED', 'PACKED', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
+const LABEL = dict('uz').status;
+const DELIVERY: Record<string, string> = { ASSIGNED: 'biriktirilgan', PICKED_UP: 'olib ketdi', IN_TRANSIT: 'yo‘lda', DELIVERED: 'topshirdi', RETURNED: 'qaytardi' };
+
+export default function AdminOrdersPage() {
+  const [status, setStatus] = useState('NEW');
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [couriers, setCouriers] = useState<Courier[]>([]);
+  const [msg, setMsg] = useState('');
 
   const load = useCallback(async () => {
     try {
-      const [p, c, a] = await Promise.all([api<AdminProduct[]>('/admin/products'), api<AdminCategory[]>('/admin/categories'), api<Named[]>('/animal-types', { locale: 'uz' })]);
-      setProducts(p);
-      setCategories(c);
-      setAnimals(a);
+      const [o, c] = await Promise.all([api<Order[]>(`/staff/orders?status=${status}`), api<Courier[]>('/staff/couriers')]);
+      setOrders(o);
+      setCouriers(c);
     } catch (e) {
-      setMsg({ ok: false, text: (e as Error).message });
+      setMsg((e as Error).message);
     }
-  }, []);
+  }, [status]);
 
   useEffect(() => {
-    if (session?.role === 'ADMIN') load();
-  }, [session, load]);
-
-  const done = (text: string) => {
-    setMsg({ ok: true, text });
-    setEditing(null);
     load();
-  };
-  const fail = (e: unknown) => setMsg({ ok: false, text: (e as Error).message });
+  }, [load]);
 
-  // Ro'yxatdan turib bitta belgini almashtirish (yangi / trend / holat).
-  const quickUpdate = async (p: AdminProduct, patch: Partial<Pick<AdminProduct, 'isNew' | 'isTrending' | 'status'>>) => {
+  const act = async (path: string, body?: unknown) => {
+    setMsg('');
     try {
-      await api(`/admin/products/${p.id}`, { method: 'PATCH', body: toPayload({ ...toInput(p), ...patch }) });
-      setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, ...patch } : x)));
+      await api(path, { method: 'POST', body });
+      load();
     } catch (e) {
-      fail(e);
+      setMsg((e as Error).message);
     }
   };
-
-  const remove = async (p: AdminProduct) => {
-    if (!confirm(`«${p.titleUz}» o‘chirilsinmi?`)) return;
-    try {
-      const r = await api<{ archived?: boolean }>(`/admin/products/${p.id}`, { method: 'DELETE' });
-      done(r.archived ? `«${p.titleUz}» sotilgan yoki omborda partiyasi bor, shuning uchun o‘chirilmadi: arxivga o‘tkazildi` : `«${p.titleUz}» o‘chirildi`);
-    } catch (e) {
-      fail(e);
-    }
-  };
-
-  const visible = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    return products.filter((p) => {
-      if (s && !`${p.titleUz} ${p.titleRu} ${p.slug} ${p.variants.map((v) => v.sku).join(' ')}`.toLowerCase().includes(s)) return false;
-      if (filter === 'new') return p.isNew;
-      if (filter === 'trending') return p.isTrending;
-      return filter === 'all' || p.status === filter;
-    });
-  }, [products, q, filter]);
-
-  if (!session) return null;
-  if (session.role !== 'ADMIN') return <p className="card p-6 text-center text-slate-500">Bu sahifa faqat administrator uchun.</p>;
-
-  const filters: [Filter, string][] = [
-    ['all', `Barchasi (${products.length})`],
-    ['ACTIVE', STATUS_LABEL.ACTIVE],
-    ['DRAFT', STATUS_LABEL.DRAFT],
-    ['ARCHIVED', STATUS_LABEL.ARCHIVED],
-    ['new', `Yangi (${products.filter((p) => p.isNew).length})`],
-    ['trending', `Trendda (${products.filter((p) => p.isTrending).length})`],
-  ];
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-bold">{t.adminPanel}</h1>
-        <div className="flex gap-2">
-          {(Object.keys(TABS) as Tab[]).map((k) => (
-            <button key={k} className={tab === k ? 'btn py-2' : 'btn-ghost py-2'} onClick={() => (setTab(k), setEditing(null), setMsg(null))}>
-              {TABS[k]}
-            </button>
-          ))}
-        </div>
-        {tab === 'products' && !editing && (
-          <button className="btn ml-auto" onClick={() => (setEditing('new'), setMsg(null))}>
-            + Yangi mahsulot
+      <h1 className="text-lg font-bold">Buyurtmalar</h1>
+      <div className="flex flex-wrap gap-1.5">
+        {STATUSES.map((s) => (
+          <button
+            key={s}
+            onClick={() => setStatus(s)}
+            className={`rounded-md border px-3 py-1.5 ${status === s ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+          >
+            {LABEL[s]}
           </button>
-        )}
+        ))}
       </div>
+      {msg && <p className="rounded-md bg-red-50 p-3 text-red-700">{msg}</p>}
+      {orders.length === 0 && <p className="rounded-md bg-white p-6 text-center text-slate-500">Bu holatda buyurtma yo‘q</p>}
 
-      {msg && (
-        <p className={`flex items-start justify-between gap-3 rounded-xl p-3 text-sm ${msg.ok ? 'bg-brand-50 text-brand-700' : 'bg-red-50 text-red-700'}`}>
-          {msg.text}
-          <button onClick={() => setMsg(null)} aria-label="Yopish">
-            ✕
-          </button>
-        </p>
-      )}
-
-      {tab === 'categories' && <CategoryManager categories={categories} onChanged={done} />}
-
-      {tab === 'products' && editing && (
-        <ProductForm
-          key={editing === 'new' ? 'new' : editing.id}
-          product={editing === 'new' ? null : editing}
-          categories={categories}
-          animals={animals}
-          onSaved={done}
-          onCancel={() => setEditing(null)}
-        />
-      )}
-
-      {tab === 'products' && !editing && (
-        <>
-          <div className="flex flex-wrap items-center gap-2">
-            <input className="input max-w-xs" placeholder="Nomi, slug yoki SKU bo‘yicha qidirish…" value={q} onChange={(e) => setQ(e.target.value)} />
-            {filters.map(([k, label]) => (
-              <button
-                key={k}
-                onClick={() => setFilter(k)}
-                className={`rounded-full border px-3 py-1 text-sm ${filter === k ? 'border-brand-600 bg-brand-50' : 'border-slate-200 bg-white'}`}
-              >
-                {label}
-              </button>
-            ))}
+      {orders.map((o) => (
+        <article key={o.id} className="flex flex-col gap-3 rounded-md border border-slate-200 bg-white p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <b>#{o.id}</b>
+            <StatusBadge status={o.status} label={LABEL[o.status]} />
+            <span className="text-slate-500">{date(o.createdAt)}</span>
+            <span className="ml-auto font-semibold">{price(o.total, 'so‘m')}</span>
           </div>
 
-          <div className="card overflow-x-auto">
-            <table className="w-full min-w-[860px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs text-slate-500">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <p className="text-xs uppercase text-slate-400">Qabul qiluvchi</p>
+              <p className="font-medium">{o.user.name ?? '—'}</p>
+              <a href={`tel:${o.user.phone}`} className="text-brand-700">
+                {o.user.phone}
+              </a>
+              {o.user.telegramUsername && <span className="ml-2 text-slate-500">@{o.user.telegramUsername}</span>}
+            </div>
+            <div>
+              <p className="text-xs uppercase text-slate-400">Manzil</p>
+              <p>
+                {o.address.zone.regionUz}, {o.address.street}
+              </p>
+              {o.address.landmark && <p className="text-slate-500">Mo‘ljal: {o.address.landmark}</p>}
+              <p className="text-slate-500">
+                {o.paymentMethod} · {o.payments.some((p) => p.state === 'PAID') ? 'to‘langan' : 'to‘lanmagan'}
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px] text-left">
+              <thead className="text-xs text-slate-500">
                 <tr>
-                  <th className="px-4 py-2 font-normal">Mahsulot</th>
-                  <th className="font-normal">Kategoriya</th>
-                  <th className="font-normal">Narx</th>
-                  <th className="font-normal">Holati</th>
-                  <th className="text-center font-normal">Yangi</th>
-                  <th className="text-center font-normal">Trend</th>
-                  <th />
+                  <th className="py-1 font-normal">Mahsulot</th>
+                  <th className="font-normal">Soni</th>
+                  <th className="font-normal">Partiya</th>
+                  <th className="font-normal">Muddati</th>
                 </tr>
               </thead>
               <tbody>
-                {visible.map((p) => {
-                  const cheapest = p.variants[0];
-                  return (
-                    <tr key={p.id} className="border-t border-slate-100 align-middle">
-                      <td className="px-4 py-2">
-                        <div className="flex items-center gap-3">
-                          <ProductImage src={p.images[0]?.url ?? null} alt="" className="h-12 w-12 shrink-0 rounded-lg border border-slate-100" />
-                          <div className="min-w-0">
-                            <div className="font-medium">{p.titleUz}</div>
-                            <div className="text-xs text-slate-500">{p.titleRu || <span className="text-amber-600">Ruscha nomi yo‘q</span>}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="text-slate-600">{p.category.nameUz}</td>
-                      <td className="whitespace-nowrap">
-                        {cheapest ? (
-                          <>
-                            <b>{price(cheapest.price, 'so‘m')}</b>
-                            {cheapest.oldPrice && <div className="text-xs text-slate-400 line-through">{price(cheapest.oldPrice, 'so‘m')}</div>}
-                            {p.variants.length > 1 && <div className="text-xs text-slate-500">{p.variants.length} ta qadoq</div>}
-                          </>
-                        ) : (
-                          <span className="text-red-600">Narx yo‘q</span>
-                        )}
-                      </td>
-                      <td>
-                        <select
-                          className={`rounded-lg border-0 px-2 py-1 text-xs font-medium ${STATUS_STYLE[p.status]}`}
-                          value={p.status}
-                          onChange={(e) => quickUpdate(p, { status: e.target.value as ProductStatus })}
-                        >
-                          {(Object.keys(STATUS_LABEL) as ProductStatus[]).map((s) => (
-                            <option key={s} value={s}>
-                              {STATUS_LABEL[s]}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="text-center">
-                        <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={p.isNew} onChange={(e) => quickUpdate(p, { isNew: e.target.checked })} />
-                      </td>
-                      <td className="text-center">
-                        <input type="checkbox" className="h-4 w-4 accent-amber-500" checked={p.isTrending} onChange={(e) => quickUpdate(p, { isTrending: e.target.checked })} />
-                      </td>
-                      <td className="whitespace-nowrap pr-4 text-right">
-                        <button className="mr-3 text-brand-700 hover:underline" onClick={() => (setEditing(p), setMsg(null))}>
-                          Tahrirlash
-                        </button>
-                        <button className="text-red-600 hover:underline" onClick={() => remove(p)}>
-                          O‘chirish
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {visible.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="p-6 text-center text-slate-500">
-                      Mahsulot topilmadi
-                    </td>
+                {o.items.map((i) => (
+                  <tr key={i.id} className="border-t border-slate-100">
+                    <td className="py-1.5">{i.title}</td>
+                    <td>{i.qty}</td>
+                    <td>{i.batch.batchNo}</td>
+                    <td>{date(i.batch.expiryDate)}</td>
                   </tr>
-                )}
+                ))}
               </tbody>
             </table>
           </div>
-        </>
-      )}
+          {o.comment && <p className="rounded-md bg-amber-50 p-2">Izoh: {o.comment}</p>}
+          {o.delivery && (
+            <p className="text-slate-600">
+              Kuryer: {o.delivery.courier.user.name} {o.delivery.courier.user.phone} · {DELIVERY[o.delivery.status] ?? o.delivery.status}
+            </p>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {o.status === 'NEW' && (
+              <button className="btn py-2" onClick={() => act(`/staff/orders/${o.id}/status`, { status: 'CONFIRMED' })}>
+                Tasdiqlash
+              </button>
+            )}
+            {o.status === 'CONFIRMED' && (
+              <button className="btn py-2" onClick={() => act(`/staff/orders/${o.id}/status`, { status: 'PACKED' })}>
+                Yig‘ildi
+              </button>
+            )}
+            {o.status === 'PACKED' && !o.delivery && (
+              <select className="input w-auto py-2" defaultValue="" onChange={(e) => e.target.value && act(`/staff/orders/${o.id}/assign-courier`, { courierId: Number(e.target.value) })}>
+                <option value="">Kuryerga biriktirish…</option>
+                {couriers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.user.name ?? c.user.phone} · {c.zone?.regionUz ?? 'hudud yo‘q'} · {c._count.deliveries} faol
+                  </option>
+                ))}
+              </select>
+            )}
+            {['NEW', 'CONFIRMED', 'PACKED'].includes(o.status) && !o.delivery && (
+              <button className="btn-ghost py-2" onClick={() => act(`/staff/orders/${o.id}/cancel`)}>
+                Bekor qilish
+              </button>
+            )}
+          </div>
+        </article>
+      ))}
     </div>
   );
 }

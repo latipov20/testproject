@@ -1,5 +1,5 @@
-// To'liq oqimni tekshiradi: xaridor -> buyurtma -> operator -> kuryer -> yetkazildi, hamda Payme JSON-RPC.
-// Ishga tushirish: API ishlab turgan bo'lishi kerak (SMS_PROVIDER=console, PAYME_KEY o'rnatilgan).
+// To'liq oqimni tekshiradi: xaridor -> buyurtma -> admin -> kuryer -> yetkazildi, hamda Payme JSON-RPC.
+// Ishga tushirish: API ishlab turgan bo'lishi kerak (AUTH_DEV_MODE=true, PAYME_KEY o'rnatilgan).
 import assert from 'node:assert/strict';
 
 const API = process.env.API_URL ?? 'http://localhost:4000/v1';
@@ -15,16 +15,18 @@ async function call(method: string, path: string, body?: unknown, token?: string
   return json;
 }
 
+// Telegram orqali kirish, bot ulanmagan sinov rejimida (API: AUTH_DEV_MODE=true, TELEGRAM_BOT_TOKEN bo'sh).
 async function login(phone: string) {
-  const { devCode } = await call('POST', '/auth/otp/send', { phone });
-  const { accessToken } = await call('POST', '/auth/otp/verify', { phone, code: devCode });
+  const { token } = await call('POST', '/auth/telegram/start');
+  const { devCode } = await call('POST', '/auth/telegram/dev-contact', { token, phone });
+  const { accessToken } = await call('POST', '/auth/telegram/verify', { token, code: devCode });
   return accessToken as string;
 }
 
 async function main() {
   const phone = `+99891${String(Date.now()).slice(-7)}`;
   const customer = await login(phone);
-  const operator = await login('+998900000002');
+  const admin = await login('+998900000001');
   const courier = await login('+998900000003');
 
   // Katalog
@@ -44,18 +46,18 @@ async function main() {
   // Buyurtma: 12 dona -> B1 partiyadan (10, muddati yaqin) va B2 dan (2). FEFO.
   const order = await call('POST', '/orders', { addressId: address.id, paymentMethod: 'CASH' }, customer);
   assert.equal(order.total, variant.price * 12 + 20000);
-  const batches = await call('GET', `/staff/batches?variantId=${variant.id}`, undefined, operator);
+  const batches = await call('GET', `/staff/batches?variantId=${variant.id}`, undefined, admin);
   const used = order.items.map((i: any) => [batches.find((b: any) => b.id === i.batchId).batchNo, i.qty]);
   console.log('FEFO taqsimot:', used);
   assert.equal(order.items[0].qty <= 10, true);
   const after = await call('GET', '/products/multivitamin-kompleksi');
   assert.equal(after.variants[0].stock, stockBefore - 12);
 
-  // Operator: tasdiqlash, yig'ish, kuryerga biriktirish
-  await call('POST', `/staff/orders/${order.id}/status`, { status: 'CONFIRMED' }, operator);
-  await call('POST', `/staff/orders/${order.id}/status`, { status: 'PACKED' }, operator);
-  const couriers = await call('GET', '/staff/couriers', undefined, operator);
-  const delivery = await call('POST', `/staff/orders/${order.id}/assign-courier`, { courierId: couriers[0].id }, operator);
+  // Admin: tasdiqlash, yig'ish, kuryerga biriktirish
+  await call('POST', `/staff/orders/${order.id}/status`, { status: 'CONFIRMED' }, admin);
+  await call('POST', `/staff/orders/${order.id}/status`, { status: 'PACKED' }, admin);
+  const couriers = await call('GET', '/staff/couriers', undefined, admin);
+  const delivery = await call('POST', `/staff/orders/${order.id}/assign-courier`, { courierId: couriers[0].id }, admin);
   assert.equal(delivery.codAmount, order.total);
 
   // Kuryer: olish va topshirish (naqd)
@@ -98,7 +100,7 @@ async function main() {
   const restored = (await call('GET', '/products/multivitamin-kompleksi')).variants[0].stock;
   assert.equal(restored, mid + 3);
 
-  // Ruxsatlar: xaridor operator API'siga kira olmaydi
+  // Ruxsatlar: xaridor admin API'siga kira olmaydi
   await assert.rejects(call('GET', '/staff/orders', undefined, customer), /403/);
 
   console.log('Smoke test: hammasi o‘tdi');

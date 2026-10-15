@@ -10,9 +10,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Do'konda faqat xaridor; backstage'da admin va kuryer.
 enum Role {
   CUSTOMER
-  OPERATOR
   COURIER
   ADMIN
 }
@@ -79,6 +79,9 @@ model User {
   name      String?
   locale    Locale   @default(uz)
   role      Role     @default(CUSTOMER)
+  // Telegram bot orqali tasdiqlangan akkaunt: telefon raqam botdagi "raqamni yuborish" orqali olinadi.
+  telegramId       BigInt? @unique
+  telegramUsername String?
   createdAt DateTime @default(now())
 
   addresses Address[]
@@ -88,16 +91,22 @@ model User {
   courier   Courier?
 }
 
-model OtpCode {
-  id        Int      @id @default(autoincrement())
-  phone     String
-  codeHash  String
-  attempts  Int      @default(0)
+// Telegram orqali kirish: sayt token yaratadi, bot raqamni oladi va kod yuboradi, sayt kodni tekshiradi.
+model TelegramLogin {
+  id        Int       @id @default(autoincrement())
+  token     String    @unique
+  chatId    BigInt?
+  phone     String?
+  firstName String?
+  lastName  String?
+  username  String?
+  codeHash  String?
+  attempts  Int       @default(0)
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
-  @@index([phone, createdAt])
+  @@index([chatId, createdAt])
 }
 
 model Address {

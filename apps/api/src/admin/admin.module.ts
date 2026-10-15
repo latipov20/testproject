@@ -245,6 +245,8 @@ class AdminController {
 
   @Post('couriers')
   async createCourier(@CurrentUser() user: AuthUser, @Body() dto: CourierDto) {
+    const existing = await this.prisma.user.findUnique({ where: { phone: dto.phone } });
+    if (existing?.role === 'ADMIN') throw new BadRequestException('Bu raqam administratorga tegishli, uni kuryer qilib bo‘lmaydi');
     const u = await this.prisma.user.upsert({
       where: { phone: dto.phone },
       update: { role: 'COURIER', name: dto.name },
@@ -261,6 +263,7 @@ class AdminController {
 
   @Patch('users/:id/role')
   async setRole(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number, @Body() dto: RoleDto) {
+    if (id === user.id) throw new BadRequestException('O‘z rolingizni o‘zgartira olmaysiz');
     const updated = await this.prisma.user.update({ where: { id }, data: { role: dto.role } });
     await this.audit(user, 'set_role', 'user', id, { role: dto.role });
     return updated;

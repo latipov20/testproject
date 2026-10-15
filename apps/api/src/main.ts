@@ -5,6 +5,11 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { UPLOAD_DIR } from './admin/admin.module';
 import { AppModule } from './app.module';
 
+// Telegram id'lari BigInt: JSON javoblarda matn sifatida chiqadi.
+(BigInt.prototype as unknown as { toJSON(): string }).toJSON = function (this: bigint) {
+  return this.toString();
+};
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.setGlobalPrefix('v1');

@@ -1,9 +1,9 @@
 'use client';
-import { ClipboardList, Heart, LayoutDashboard, ShoppingBag, Truck, User, type LucideIcon } from 'lucide-react';
+import { ClipboardList, Heart, ShoppingBag, User, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { getSession, Session, setSession } from '@/lib/client';
+import { getSession, Session } from '@/lib/client';
 import type { Dict, Locale } from '@/lib/i18n';
 import { useShop } from '@/lib/shop';
 
@@ -49,31 +49,17 @@ function IconLink({ href, icon: Icon, label, badge }: { href: string; icon: Luci
 }
 
 // Kompyuterda headerning o'ng tomonidagi ikonkalar. Telefonda ularning o'rnini pastki menyu bosadi.
+// Do'kon faqat xaridor uchun: admin va kuryer backstage'ga (/admin, /courier) to'g'ridan-to'g'ri kiradi.
 export function HeaderActions({ locale, t }: { locale: Locale; t: Dict }) {
   const session = useSession();
   const { cartCount, favorites } = useShop();
-  const role = session?.role;
 
   return (
     <nav className="hidden items-center gap-1 md:flex">
-      {role === 'ADMIN' && <IconLink href={`/${locale}/admin`} icon={LayoutDashboard} label="Admin" />}
-      {(role === 'OPERATOR' || role === 'ADMIN') && <IconLink href={`/${locale}/staff`} icon={ClipboardList} label="Operator" />}
-      {role === 'COURIER' && <IconLink href={`/${locale}/courier`} icon={Truck} label={t.courierPanel} />}
-      {session ? (
-        <button onClick={() => setSession(null)} className="flex min-w-14 flex-col items-center gap-0.5 rounded-xl px-2 py-1 text-xs text-slate-600 hover:text-brand-700" title={session.phone}>
-          <User className="h-6 w-6" strokeWidth={1.75} />
-          {t.logout}
-        </button>
-      ) : (
-        <IconLink href={`/${locale}/login`} icon={User} label={t.login} />
-      )}
-      {(!session || role === 'CUSTOMER') && (
-        <>
-          <IconLink href={`/${locale}/orders`} icon={ClipboardList} label={t.orders} />
-          <IconLink href={`/${locale}/favorites`} icon={Heart} label={t.favorites} badge={favorites.size} />
-          <IconLink href={`/${locale}/cart`} icon={ShoppingBag} label={t.cart} badge={cartCount} />
-        </>
-      )}
+      <IconLink href={`/${locale}/${session ? 'cabinet' : 'login'}`} icon={User} label={session ? t.profile : t.login} />
+      <IconLink href={`/${locale}/orders`} icon={ClipboardList} label={t.orders} />
+      <IconLink href={`/${locale}/favorites`} icon={Heart} label={t.favorites} badge={favorites.size} />
+      <IconLink href={`/${locale}/cart`} icon={ShoppingBag} label={t.cart} badge={cartCount} />
     </nav>
   );
 }

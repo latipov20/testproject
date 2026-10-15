@@ -51,7 +51,7 @@ class ExpiringQuery {
 const NEXT: Partial<Record<OrderStatus, OrderStatus>> = { NEW: 'CONFIRMED', CONFIRMED: 'PACKED' };
 
 @UseGuards(AuthGuard)
-@Roles('OPERATOR', 'ADMIN')
+@Roles('ADMIN')
 @Controller('staff')
 class StaffController {
   constructor(
@@ -64,7 +64,7 @@ class StaffController {
     return this.prisma.order.findMany({
       where: q.status ? { status: q.status } : {},
       include: {
-        user: { select: { phone: true, name: true } },
+        user: { select: { phone: true, name: true, telegramUsername: true } },
         address: { include: { zone: true } },
         items: { include: { batch: { select: { batchNo: true, expiryDate: true } } } },
         payments: { select: { provider: true, state: true, amount: true } },
@@ -95,7 +95,7 @@ class StaffController {
     if (!order) throw new NotFoundException();
     if (order.status !== 'PACKED') throw new BadRequestException('Avval buyurtmani yig‘ing (PACKED)');
     if (order.delivery) throw new BadRequestException('Kuryer allaqachon biriktirilgan');
-    const courier = await this.prisma.courier.findUnique({ where: { id: dto.courierId } });
+    const courier = await this.prisma.courier.findFirst({ where: { id: dto.courierId, user: { role: 'COURIER' } } });
     if (!courier) throw new NotFoundException('Kuryer topilmadi');
     return this.prisma.delivery.create({
       data: {
@@ -110,8 +110,11 @@ class StaffController {
 
   @Get('couriers')
   couriers() {
+    // Roli olib tashlangan (sobiq) kuryerlar ro'yxatda chiqmaydi.
     return this.prisma.courier.findMany({
-      include: { user: { select: { phone: true, name: true } }, zone: true, _count: { select: { deliveries: { where: { status: { in: ['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'] } } } } } },
+      where: { user: { role: 'COURIER' } },
+      orderBy: { id: 'asc' },
+      include: { user: { select: { id: true, phone: true, name: true, telegramUsername: true } }, zone: true, _count: { select: { deliveries: { where: { status: { in: ['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'] } } } } } },
     });
   }
 
