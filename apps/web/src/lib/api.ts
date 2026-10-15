@@ -19,6 +19,8 @@ export interface ProductCard {
   oldPrice: number | null;
   packSize: string;
   inStock: boolean;
+  isNew: boolean;
+  isTrending: boolean;
 }
 
 export interface Category {
@@ -44,6 +46,8 @@ export interface ProductDetail {
   manufacturer: string;
   registrationNo: string | null;
   storageTemp: string | null;
+  isNew: boolean;
+  isTrending: boolean;
   category: { slug: string; name: string };
   animalTypes: { slug: string; name: string }[];
   images: string[];

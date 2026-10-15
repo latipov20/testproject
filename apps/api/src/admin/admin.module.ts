@@ -1,8 +1,26 @@
-import { BadRequestException, Body, Controller, Get, Module, NotFoundException, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ProductStatus, Role } from '@prisma/client';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Module,
+  NotFoundException,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Prisma, ProductStatus, Role } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsEnum,
@@ -14,6 +32,9 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { randomUUID } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { AuthGuard, AuthUser, CurrentUser, Roles } from '../common/auth';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -38,9 +59,11 @@ class ProductDto {
   @IsOptional() @IsString() registrationNo?: string;
   @IsOptional() @IsString() storageTemp?: string;
   @IsOptional() @IsEnum(ProductStatus) status?: ProductStatus;
+  @IsOptional() @IsBoolean() isNew?: boolean;
+  @IsOptional() @IsBoolean() isTrending?: boolean;
   @IsOptional() @IsArray() @IsInt({ each: true }) animalTypeIds?: number[];
   @IsOptional() @IsArray() @IsString({ each: true }) images?: string[];
-  @IsArray() @ValidateNested({ each: true }) @Type(() => VariantDto) variants: VariantDto[];
+  @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => VariantDto) variants: VariantDto[];
 }
 
 class ImportDto {
@@ -69,11 +92,22 @@ class RoleDto {
 }
 
 class CategoryDto {
-  @IsOptional() @IsInt() parentId?: number;
-  @IsString() nameUz: string;
-  @IsString() nameRu: string;
+  @IsOptional() @IsInt() parentId?: number | null;
+  @IsString() @MaxLength(120) nameUz: string;
+  @IsString() @MaxLength(120) nameRu: string;
   @Matches(/^[a-z0-9-]+$/) slug: string;
+  @IsOptional() @IsInt() position?: number;
 }
+
+// Multer xotirada saqlagan fayl (faqat kerakli maydonlar).
+interface UploadFile {
+  buffer: Buffer;
+  mimetype: string;
+  size: number;
+}
+
+const IMAGE_EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+export const UPLOAD_DIR = join(process.cwd(), 'uploads');
 
 @UseGuards(AuthGuard)
 @Roles('ADMIN')
@@ -85,14 +119,19 @@ class AdminController {
   products(@Query('q') q?: string) {
     return this.prisma.product.findMany({
       where: q ? { OR: [{ titleUz: { contains: q, mode: 'insensitive' } }, { titleRu: { contains: q, mode: 'insensitive' } }] } : {},
-      include: { variants: true, category: true, animalTypes: true, images: true },
+      include: {
+        variants: { where: { active: true }, orderBy: { price: 'asc' } },
+        category: true,
+        animalTypes: true,
+        images: { orderBy: { position: 'asc' } },
+      },
       orderBy: { id: 'desc' },
     });
   }
 
   @Post('products')
   async createProduct(@CurrentUser() user: AuthUser, @Body() dto: ProductDto) {
-    const product = await this.upsertProduct(dto);
+    const product = await this.saveProduct(dto);
     await this.audit(user, 'create', 'product', product.id);
     return product;
   }
@@ -101,10 +140,44 @@ class AdminController {
   async updateProduct(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ProductDto) {
     const existing = await this.prisma.product.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException();
-    if (existing.slug !== dto.slug) throw new BadRequestException('Slug o‘zgartirilmaydi');
-    const product = await this.upsertProduct(dto);
+    const product = await this.saveProduct(dto, id);
     await this.audit(user, 'update', 'product', id);
     return product;
+  }
+
+  // Sotilgan yoki omborda partiyasi bor mahsulot o'chirilmaydi, arxivga o'tkaziladi (tarix saqlanadi).
+  @Delete('products/:id')
+  async deleteProduct(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+    const product = await this.prisma.product.findUnique({ where: { id }, include: { variants: { select: { id: true } } } });
+    if (!product) throw new NotFoundException();
+    const variantIds = product.variants.map((v) => v.id);
+    const [orders, batches] = await Promise.all([
+      this.prisma.orderItem.count({ where: { variantId: { in: variantIds } } }),
+      this.prisma.batch.count({ where: { variantId: { in: variantIds } } }),
+    ]);
+    if (orders || batches) {
+      await this.prisma.product.update({ where: { id }, data: { status: 'ARCHIVED', isNew: false, isTrending: false } });
+      await this.audit(user, 'archive', 'product', id);
+      return { archived: true };
+    }
+    await this.prisma.$transaction([
+      this.prisma.cartItem.deleteMany({ where: { variantId: { in: variantIds } } }),
+      this.prisma.product.delete({ where: { id } }),
+    ]);
+    await this.audit(user, 'delete', 'product', id);
+    return { deleted: true };
+  }
+
+  // Rasm API serverining uploads/ papkasiga yoziladi va /uploads/<fayl> manzilida beriladi.
+  @Post('uploads')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  async upload(@UploadedFile() file?: UploadFile) {
+    const ext = file && IMAGE_EXT[file.mimetype];
+    if (!file || !ext) throw new BadRequestException('Faqat JPG, PNG, WEBP yoki GIF rasm (5 MB gacha)');
+    const name = `${randomUUID()}.${ext}`;
+    await mkdir(UPLOAD_DIR, { recursive: true });
+    await writeFile(join(UPLOAD_DIR, name), file.buffer);
+    return { url: `/uploads/${name}` };
   }
 
   // Ommaviy import: admin panel Excel faylni o'qib, shu formatda yuboradi. Slug bo'yicha yangilanadi.
@@ -112,16 +185,47 @@ class AdminController {
   async import(@CurrentUser() user: AuthUser, @Body() dto: ImportDto) {
     let count = 0;
     for (const p of dto.products) {
-      await this.upsertProduct(p);
+      const existing = await this.prisma.product.findUnique({ where: { slug: p.slug }, select: { id: true } });
+      await this.saveProduct(p, existing?.id);
       count++;
     }
     await this.audit(user, 'import', 'product', undefined, { count });
     return { imported: count };
   }
 
+  @Get('categories')
+  categories() {
+    return this.prisma.category.findMany({
+      orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      include: { _count: { select: { products: true, children: true } } },
+    });
+  }
+
   @Post('categories')
-  createCategory(@Body() dto: CategoryDto) {
-    return this.prisma.category.create({ data: dto });
+  async createCategory(@CurrentUser() user: AuthUser, @Body() dto: CategoryDto) {
+    await this.checkParent(dto.parentId);
+    const category = await this.prisma.category.create({ data: dto }).catch(dbError);
+    await this.audit(user, 'create', 'category', category.id);
+    return category;
+  }
+
+  @Patch('categories/:id')
+  async updateCategory(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number, @Body() dto: CategoryDto) {
+    await this.checkParent(dto.parentId, id);
+    const category = await this.prisma.category.update({ where: { id }, data: { ...dto, parentId: dto.parentId ?? null } }).catch(dbError);
+    await this.audit(user, 'update', 'category', id);
+    return category;
+  }
+
+  @Delete('categories/:id')
+  async deleteCategory(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+    const c = await this.prisma.category.findUnique({ where: { id }, include: { _count: { select: { products: true, children: true } } } });
+    if (!c) throw new NotFoundException();
+    if (c._count.children) throw new BadRequestException('Avval subkategoriyalarni o‘chiring');
+    if (c._count.products) throw new BadRequestException(`Kategoriyada ${c._count.products} ta mahsulot bor. Avval ularni boshqa kategoriyaga o‘tkazing`);
+    await this.prisma.category.delete({ where: { id } });
+    await this.audit(user, 'delete', 'category', id);
+    return { deleted: true };
   }
 
   @Get('zones')
@@ -175,32 +279,74 @@ class AdminController {
     return { sales, stockUnits: stock._sum.qty ?? 0, ordersByStatus: byStatus };
   }
 
-  private async upsertProduct(dto: ProductDto) {
+  // Ikki daraja: kategoriya va uning subkategoriyasi. Subkategoriya ichiga yana kategoriya qo'yilmaydi.
+  private async checkParent(parentId: number | null | undefined, selfId?: number) {
+    if (parentId == null) return;
+    if (parentId === selfId) throw new BadRequestException('Kategoriya o‘ziga ota bo‘la olmaydi');
+    const parent = await this.prisma.category.findUnique({ where: { id: parentId } });
+    if (!parent) throw new BadRequestException('Ota kategoriya topilmadi');
+    if (parent.parentId !== null) throw new BadRequestException('Subkategoriya ichida subkategoriya ochib bo‘lmaydi');
+    if (selfId && (await this.prisma.category.count({ where: { parentId: selfId } })))
+      throw new BadRequestException('Bu kategoriyaning subkategoriyalari bor, uni boshqa kategoriya ichiga qo‘yib bo‘lmaydi');
+  }
+
+  // id berilsa yangilaydi, bo'lmasa yaratadi. Formadan olib tashlangan qadoqlar:
+  // sotilgan yoki partiyasi borlari o'chirilmaydi, faqat nofaol qilinadi.
+  private async saveProduct(dto: ProductDto, id?: number) {
     const { variants, animalTypeIds, images, ...fields } = dto;
-    return this.prisma.$transaction(async (tx) => {
-      const product = await tx.product.upsert({
-        where: { slug: dto.slug },
-        update: { ...fields, animalTypes: animalTypeIds ? { set: animalTypeIds.map((id) => ({ id })) } : undefined },
-        create: { ...fields, animalTypes: { connect: (animalTypeIds ?? []).map((id) => ({ id })) } },
-      });
-      for (const v of variants) {
-        await tx.productVariant.upsert({
-          where: { sku: v.sku },
-          update: { ...v, productId: product.id, active: true },
-          create: { ...v, productId: product.id },
+    const skus = variants.map((v) => v.sku);
+    if (new Set(skus).size !== skus.length) throw new BadRequestException('SKU takrorlanmasligi kerak');
+    const foreign = await this.prisma.productVariant.findFirst({ where: { sku: { in: skus }, ...(id ? { NOT: { productId: id } } : {}) } });
+    if (foreign) throw new BadRequestException(`SKU ${foreign.sku} boshqa mahsulotda bor`);
+
+    return this.prisma
+      .$transaction(async (tx) => {
+        const product = id
+          ? await tx.product.update({
+              where: { id },
+              data: { ...fields, animalTypes: animalTypeIds ? { set: animalTypeIds.map((a) => ({ id: a })) } : undefined },
+            })
+          : await tx.product.create({ data: { ...fields, animalTypes: { connect: (animalTypeIds ?? []).map((a) => ({ id: a })) } } });
+
+        for (const v of variants) {
+          await tx.productVariant.upsert({
+            where: { sku: v.sku },
+            update: { packSize: v.packSize, price: v.price, oldPrice: v.oldPrice ?? null, active: true },
+            create: { ...v, productId: product.id },
+          });
+        }
+        const removed = await tx.productVariant.findMany({
+          where: { productId: product.id, sku: { notIn: skus } },
+          include: { _count: { select: { batches: true, orderItems: true } } },
         });
-      }
-      if (images) {
-        await tx.productImage.deleteMany({ where: { productId: product.id } });
-        await tx.productImage.createMany({ data: images.map((url, position) => ({ productId: product.id, url, position })) });
-      }
-      return tx.product.findUniqueOrThrow({ where: { id: product.id }, include: { variants: true, images: true, animalTypes: true } });
-    });
+        for (const v of removed) {
+          if (v._count.batches || v._count.orderItems) {
+            await tx.productVariant.update({ where: { id: v.id }, data: { active: false } });
+          } else {
+            await tx.cartItem.deleteMany({ where: { variantId: v.id } });
+            await tx.productVariant.delete({ where: { id: v.id } });
+          }
+        }
+
+        if (images) {
+          await tx.productImage.deleteMany({ where: { productId: product.id } });
+          await tx.productImage.createMany({ data: images.map((url, position) => ({ productId: product.id, url, position })) });
+        }
+        return tx.product.findUniqueOrThrow({ where: { id: product.id }, include: { variants: true, images: true, animalTypes: true } });
+      })
+      .catch(dbError);
   }
 
   private audit(user: AuthUser, action: string, entity: string, entityId?: number, diff?: object) {
     return this.prisma.auditLog.create({ data: { actorId: user.id, action, entity, entityId, diff } });
   }
+}
+
+// Bazaning tushunarsiz xatolarini admin uchun o'qiladigan matnga aylantiradi.
+function dbError(e: unknown): never {
+  if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') throw new BadRequestException('Bu slug band, boshqasini kiriting');
+  if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') throw new BadRequestException('Kategoriya yoki hayvon turi topilmadi');
+  throw e;
 }
 
 @Module({ controllers: [AdminController] })

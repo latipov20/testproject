@@ -8,7 +8,7 @@ Reja va arxitektura hujjati: https://claude.ai/code/artifact/4951a6a8-91ed-421b-
 | Papka | Nima | Texnologiya |
 | --- | --- | --- |
 | `apps/api` | REST API (`/v1`), Swagger hujjati `/docs` | NestJS 11, Prisma 6, PostgreSQL 16 |
-| `apps/web` | Xaridor sayti (uz/ru), operator paneli (`/uz/staff`), kuryer paneli (`/uz/courier`) | Next.js 15, Tailwind CSS |
+| `apps/web` | Xaridor sayti (uz/ru), admin paneli (`/uz/admin`), operator paneli (`/uz/staff`), kuryer paneli (`/uz/courier`) | Next.js 15, Tailwind CSS |
 
 ## Ishga tushirish (lokal)
 
@@ -61,8 +61,8 @@ PAYME_KEY=<.env dagi kalit> pnpm --filter api test:e2e
 
 ## Keyingi qadamlar
 
-- Admin paneli: mahsulotlarni qo'shish va tahrirlash, Excel import, hududlar, kuryerlar. API tayyor (`/v1/admin/*`).
-- Mahsulot rasmlarini yuklash (S3).
+- Admin paneli: Excel import, hududlar, kuryerlar (API tayyor: `/v1/admin/*`). Mahsulot va kategoriyalar paneli tayyor.
+- Mahsulot rasmlarini S3 yoki CDN ga ko'chirish (hozir API serverining `apps/api/uploads` papkasida).
 - Refresh tokenni httpOnly cookie'ga ko'chirish.
 - Payme va Click'ni sandbox'da sinash, fiskal chek integratsiyasi.
 - Serverga joylash: Docker, HTTPS, latipov.org.uz va api.latipov.org.uz domenlari.

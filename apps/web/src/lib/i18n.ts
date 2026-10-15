@@ -70,6 +70,13 @@ const uz = {
   remove: "O'chirish",
   courierPanel: 'Kuryer paneli',
   staffPanel: 'Operator paneli',
+  adminPanel: 'Admin paneli',
+  trending: 'Trenddagi tovarlar',
+  newArrivals: 'Yangi mahsulotlar',
+  badgeNew: 'Yangi',
+  badgeTrending: 'Trendda',
+  showAll: 'Barchasini ko‘rish',
+  subcategories: 'Subkategoriyalar',
 };
 
 const ru: typeof uz = {
@@ -141,6 +148,13 @@ const ru: typeof uz = {
   remove: 'Удалить',
   courierPanel: 'Панель курьера',
   staffPanel: 'Панель оператора',
+  adminPanel: 'Админ-панель',
+  trending: 'Популярные товары',
+  newArrivals: 'Новинки',
+  badgeNew: 'Новинка',
+  badgeTrending: 'Хит',
+  showAll: 'Смотреть все',
+  subcategories: 'Подкатегории',
 };
 
 export type Dict = typeof uz;

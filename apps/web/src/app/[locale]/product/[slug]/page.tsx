@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AddToCart } from '@/components/AddToCart';
+import { ProductBadges } from '@/components/ProductBadges';
 import { ProductImage } from '@/components/ProductImage';
 import { apiGet, type ProductDetail } from '@/lib/api';
 import { date } from '@/lib/format';
@@ -47,10 +48,22 @@ export default async function ProductPage({ params }: { params: Params }) {
         </Link>
       </nav>
       <div className="grid gap-6 md:grid-cols-2">
-        <div className="card overflow-hidden">
-          <ProductImage src={p.images[0] ?? null} alt={p.title} className="aspect-square" />
+        <div className="flex flex-col gap-3">
+          <div className="card overflow-hidden">
+            <ProductImage src={p.images[0] ?? null} alt={p.title} className="aspect-square" />
+          </div>
+          {p.images.length > 1 && (
+            <div className="grid grid-cols-4 gap-2">
+              {p.images.slice(1).map((src) => (
+                <div key={src} className="card overflow-hidden">
+                  <ProductImage src={src} alt={p.title} className="aspect-square" />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex flex-col gap-4">
+          <ProductBadges isNew={p.isNew} isTrending={p.isTrending} t={t} />
           <h1 className="text-2xl font-bold">{p.title}</h1>
           <div className="flex flex-wrap gap-2">
             {p.animalTypes.map((a) => (

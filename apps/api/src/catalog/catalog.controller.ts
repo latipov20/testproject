@@ -8,6 +8,7 @@ class ProductQueryDto {
   @IsOptional() @IsString() category?: string;
   @IsOptional() @IsString() animal?: string;
   @IsOptional() @IsString() q?: string;
+  @IsOptional() @IsIn(['new', 'trending']) tag?: 'new' | 'trending';
   @IsOptional() @IsIn(['new', 'price_asc', 'price_desc']) sort?: 'new' | 'price_asc' | 'price_desc';
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(60) limit?: number;

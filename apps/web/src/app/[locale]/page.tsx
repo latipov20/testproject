@@ -6,11 +6,30 @@ import { dict, type Locale } from '@/lib/i18n';
 export default async function Home({ params }: { params: Promise<{ locale: Locale }> }) {
   const { locale } = await params;
   const t = dict(locale);
-  const [categories, animals, products] = await Promise.all([
+  const [categories, animals, products, trending, newest] = await Promise.all([
     apiGet<Category[]>('/categories', locale),
     apiGet<Named[]>('/animal-types', locale),
     apiGet<{ items: P[] }>('/products?limit=12', locale),
+    apiGet<{ items: P[] }>('/products?tag=trending&limit=8', locale),
+    apiGet<{ items: P[] }>('/products?tag=new&limit=8', locale),
   ]);
+
+  const shelf = (title: string, tag: string, items: P[]) =>
+    items.length > 0 && (
+      <section>
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <h2 className="text-lg font-semibold">{title}</h2>
+          <Link href={`/${locale}/catalog?tag=${tag}`} className="text-sm text-brand-700 hover:underline">
+            {t.showAll}
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {items.map((p) => (
+            <ProductCard key={p.id} p={p} locale={locale} t={t} />
+          ))}
+        </div>
+      </section>
+    );
 
   return (
     <div className="flex flex-col gap-8">
@@ -21,6 +40,9 @@ export default async function Home({ params }: { params: Promise<{ locale: Local
           {t.catalog}
         </Link>
       </section>
+
+      {shelf(t.trending, 'trending', trending.items)}
+      {shelf(t.newArrivals, 'new', newest.items)}
 
       <section>
         <h2 className="mb-3 text-lg font-semibold">{t.animals}</h2>

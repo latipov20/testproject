@@ -152,6 +152,9 @@ model Product {
   registrationNo String?
   storageTemp    String?
   status         ProductStatus @default(DRAFT)
+  // Bosh sahifadagi "Yangi" va "Trendda" bo'limlari uchun, admin qo'lda belgilaydi.
+  isNew          Boolean       @default(false)
+  isTrending     Boolean       @default(false)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 

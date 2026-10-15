@@ -33,6 +33,11 @@ export function HeaderActions({ locale, t }: { locale: Locale; t: Dict }) {
           {t.courierPanel}
         </Link>
       )}
+      {session?.role === 'ADMIN' && (
+        <Link href={`/${locale}/admin`} className="btn-ghost py-2">
+          {t.adminPanel}
+        </Link>
+      )}
       {(session?.role === 'OPERATOR' || session?.role === 'ADMIN') && (
         <Link href={`/${locale}/staff`} className="btn-ghost py-2">
           {t.staffPanel}

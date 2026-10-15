@@ -38,15 +38,17 @@ export class ApiError extends Error {
 }
 
 export async function api<T = any>(path: string, opts: { method?: string; body?: unknown; locale?: string } = {}): Promise<T> {
+  // FormData (fayl yuklash) bo'lsa, content-type'ni brauzer o'zi qo'yadi.
+  const isForm = opts.body instanceof FormData;
   const doFetch = (token?: string) =>
     fetch(API + path, {
       method: opts.method ?? 'GET',
       headers: {
-        'content-type': 'application/json',
+        ...(isForm ? {} : { 'content-type': 'application/json' }),
         ...(opts.locale ? { 'accept-language': opts.locale } : {}),
         ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
-      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+      body: opts.body === undefined ? undefined : isForm ? (opts.body as FormData) : JSON.stringify(opts.body),
     });
 
   const session = getSession();

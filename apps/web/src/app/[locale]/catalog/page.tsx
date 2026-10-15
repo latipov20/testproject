@@ -3,7 +3,7 @@ import { ProductCard } from '@/components/ProductCard';
 import { apiGet, type Category, type Named, type ProductCard as P } from '@/lib/api';
 import { dict, type Locale } from '@/lib/i18n';
 
-type Search = { category?: string; animal?: string; q?: string; sort?: string; page?: string };
+type Search = { category?: string; animal?: string; q?: string; sort?: string; page?: string; tag?: string };
 
 export default async function Catalog({ params, searchParams }: { params: Promise<{ locale: Locale }>; searchParams: Promise<Search> }) {
   const { locale } = await params;
@@ -24,6 +24,8 @@ export default async function Catalog({ params, searchParams }: { params: Promis
   };
   const chip = (active: boolean) =>
     `rounded-full border px-3 py-1.5 text-sm ${active ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-200 bg-white hover:border-brand-500'}`;
+  // Tanlangan kategoriya yoki uning subkategoriyasi tanlangan bo'lsa, subkategoriyalar ochiladi.
+  const openParent = categories.find((c) => c.slug === sp.category || c.children.some((ch) => ch.slug === sp.category));
 
   return (
     <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
@@ -40,6 +42,26 @@ export default async function Catalog({ params, searchParams }: { params: Promis
               </Link>
             ))}
           </div>
+        </div>
+        {openParent && openParent.children.length > 0 && (
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-slate-500">{t.subcategories}</h3>
+            <div className="flex flex-wrap gap-2 lg:flex-col lg:items-start">
+              {openParent.children.map((ch) => (
+                <Link key={ch.id} href={href({ category: ch.slug })} className={chip(sp.category === ch.slug)}>
+                  {ch.name}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <Link href={href({ tag: sp.tag === 'trending' ? '' : 'trending' })} className={chip(sp.tag === 'trending')}>
+            {t.badgeTrending}
+          </Link>
+          <Link href={href({ tag: sp.tag === 'new' ? '' : 'new' })} className={chip(sp.tag === 'new')}>
+            {t.badgeNew}
+          </Link>
         </div>
         <div>
           <h3 className="mb-2 text-sm font-semibold text-slate-500">{t.animals}</h3>

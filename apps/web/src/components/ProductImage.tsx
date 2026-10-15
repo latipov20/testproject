@@ -1,8 +1,10 @@
+import { mediaUrl } from '@/lib/media';
+
 // Rasm bo'lmasa, neytral belgi ko'rsatiladi.
 export function ProductImage({ src, alt, className = '' }: { src: string | null; alt: string; className?: string }) {
   if (src) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt={alt} className={`w-full bg-white object-contain ${className}`} />;
+    return <img src={mediaUrl(src)} alt={alt} className={`w-full bg-white object-contain ${className}`} />;
   }
   return (
     <div className={`flex w-full items-center justify-center bg-brand-50 ${className}`} aria-label={alt}>

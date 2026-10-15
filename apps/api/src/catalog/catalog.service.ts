@@ -7,6 +7,7 @@ export interface ProductQuery {
   category?: string;
   animal?: string;
   q?: string;
+  tag?: 'new' | 'trending';
   sort?: 'new' | 'price_asc' | 'price_desc';
   page?: number;
   limit?: number;
@@ -55,6 +56,8 @@ export class CatalogService {
       const ids = await this.categoryWithDescendants(query.category);
       where.categoryId = { in: ids };
     }
+    if (query.tag === 'new') where.isNew = true;
+    if (query.tag === 'trending') where.isTrending = true;
     if (query.animal) where.animalTypes = { some: { slug: query.animal } };
     if (query.q?.trim()) {
       const q = query.q.trim();
@@ -104,6 +107,8 @@ export class CatalogService {
       manufacturer: p.manufacturer,
       registrationNo: p.registrationNo,
       storageTemp: p.storageTemp,
+      isNew: p.isNew,
+      isTrending: p.isTrending,
       category: { slug: p.category.slug, name: pick(p.category, 'name', lang) },
       animalTypes: p.animalTypes.map((a) => ({ slug: a.slug, name: pick(a, 'name', lang) })),
       images: p.images.map((i) => i.url),
@@ -141,6 +146,8 @@ export class CatalogService {
       price: cheapest?.price ?? 0,
       oldPrice: cheapest?.oldPrice ?? null,
       packSize: cheapest?.packSize ?? '',
+      isNew: p.isNew,
+      isTrending: p.isTrending,
       variantIds: p.variants.map((v) => v.id),
     };
   }
