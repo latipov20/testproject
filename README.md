@@ -66,6 +66,17 @@ Seed yaratgan sinov akkauntlari (sinov rejimida shu raqamlar bilan kiriladi):
 PAYME_KEY=<.env dagi kalit> pnpm --filter api test:e2e
 ```
 
+## Serverga joylash (Render)
+
+`render.yaml` Blueprint: PostgreSQL 16, `vet-products-api` va `vet-products-web`, Frankfurt regionida.
+
+1. render.com → **New → Blueprint** → `latipov20/testproject` repo → **Apply**.
+2. So'ralgan maxfiy qiymatlar: `TELEGRAM_BOT_TOKEN`, `ADMIN_PHONE` (o'zingizning raqam, `+998...`), Payme/Click kalitlari. Bo'sh qoldirsa ham bo'ladi, keyin **Environment** bo'limida qo'shiladi.
+3. API har ishga tushganda migratsiya, seed va demo katalogni bajaradi (upsert, qayta ishga tushirish xavfsiz).
+4. Render API'ga boshqa manzil bersa, web'dagi `API_URL`/`NEXT_PUBLIC_API_URL` va API'dagi `WEB_ORIGIN` ni yangilab, web'ni qayta deploy qiling.
+
+Serverda sinov rejimi o'chiq (`NODE_ENV=production`): kirish uchun bot tokeni shart. Bepul tarif cheklovlari `render.yaml` boshida yozilgan.
+
 ## Integratsiyalar
 
 | Xizmat | Holat |
@@ -81,4 +92,4 @@ PAYME_KEY=<.env dagi kalit> pnpm --filter api test:e2e
 - Mahsulot rasmlarini S3 yoki CDN ga ko'chirish (hozir API serverining `apps/api/uploads` papkasida).
 - Refresh tokenni httpOnly cookie'ga ko'chirish.
 - Payme va Click'ni sandbox'da sinash, fiskal chek integratsiyasi.
-- Serverga joylash: Docker, HTTPS, latipov.org.uz va api.latipov.org.uz domenlari.
+- latipov.org.uz va api.latipov.org.uz domenlarini Render servislariga ulash.

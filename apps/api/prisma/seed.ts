@@ -182,7 +182,7 @@ async function main() {
   }
 
   // Admin: o'z Telegram raqamingiz bilan kirish uchun ADMIN_PHONE=+998XXXXXXXXX bilan ishga tushiring.
-  const adminPhone = process.env.ADMIN_PHONE ?? '+998900000001';
+  const adminPhone = process.env.ADMIN_PHONE || '+998900000001';
   const admin = await prisma.user.upsert({
     where: { phone: adminPhone },
     update: { role: 'ADMIN' },
