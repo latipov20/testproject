@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Controller, Get, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -12,6 +12,15 @@ import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { StaffModule } from './staff/staff.module';
 import { ZonesModule } from './zones/zones.module';
+
+// Uptime monitor uchun: bazaga tegmaydi, Neon bo'sh paytda uxlay oladi.
+@Controller('health')
+class HealthController {
+  @Get()
+  health() {
+    return { ok: true };
+  }
+}
 
 @Module({
   imports: [
@@ -28,6 +37,7 @@ import { ZonesModule } from './zones/zones.module';
     CourierModule,
     AdminModule,
   ],
+  controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

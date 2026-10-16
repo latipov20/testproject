@@ -66,14 +66,16 @@ Seed yaratgan sinov akkauntlari (sinov rejimida shu raqamlar bilan kiriladi):
 PAYME_KEY=<.env dagi kalit> pnpm --filter api test:e2e
 ```
 
-## Serverga joylash (Render)
+## Serverga joylash (Render + Neon)
 
-`render.yaml` Blueprint: PostgreSQL 16, `vet-products-api` va `vet-products-web`, Frankfurt regionida.
+`render.yaml` Blueprint: `vet-products-api` va `vet-products-web` Render'da (Frankfurt), PostgreSQL esa Neon'da.
 
-1. render.com → **New → Blueprint** → `latipov20/testproject` repo → **Apply**.
-2. So'ralgan maxfiy qiymatlar: `TELEGRAM_BOT_TOKEN`, `ADMIN_PHONE` (o'zingizning raqam, `+998...`), Payme/Click kalitlari. Bo'sh qoldirsa ham bo'ladi, keyin **Environment** bo'limida qo'shiladi.
-3. API har ishga tushganda migratsiya, seed va demo katalogni bajaradi (upsert, qayta ishga tushirish xavfsiz).
-4. Render API'ga boshqa manzil bersa, web'dagi `API_URL`/`NEXT_PUBLIC_API_URL` va API'dagi `WEB_ORIGIN` ni yangilab, web'ni qayta deploy qiling.
+1. **Neon**: neon.tech → yangi loyiha, Postgres 16, region **AWS Europe Central (Frankfurt)**. **Connect** oynasida **Connection pooling** ni o'chirib, ulanish satrini nusxa oling (`postgresql://...?sslmode=require`).
+2. **Render**: render.com → **New → Blueprint** → `latipov20/testproject` repo → **Apply**.
+3. So'ralgan qiymatlar: `DATABASE_URL` (Neon satri), `TELEGRAM_BOT_TOKEN`, `ADMIN_PHONE` (o'zingizning raqam, `+998...`), Payme/Click kalitlari. Payme/Click'ni keyin **Environment** bo'limida qo'shsa ham bo'ladi.
+4. API har ishga tushganda migratsiya, seed va demo katalogni bajaradi (upsert, qayta ishga tushirish xavfsiz).
+5. **UptimeRobot** (yoki cron-job.org): `https://vet-products-api.onrender.com/v1/health` ni har 5 daqiqada tekshiradigan HTTP monitor. Shunda API va Telegram bot uxlamaydi. Endpoint bazaga tegmaydi, Neon bo'sh paytda uxlab, bepul limitni tejaydi.
+6. Render API'ga boshqa manzil bersa, web'dagi `API_URL`/`NEXT_PUBLIC_API_URL` va API'dagi `WEB_ORIGIN` ni yangilab, web'ni qayta deploy qiling.
 
 Serverda sinov rejimi o'chiq (`NODE_ENV=production`): kirish uchun bot tokeni shart. Bepul tarif cheklovlari `render.yaml` boshida yozilgan.
 
