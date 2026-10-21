@@ -115,7 +115,7 @@ export default function AdminCouriersPage() {
             <input className="input py-2" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} inputMode="tel" />
           </label>
           <label className="flex flex-col gap-1">
-            Ismi
+            Ism familiya
             <input className="input py-2" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </label>
           <label className="flex flex-col gap-1">
