@@ -58,7 +58,13 @@ export default function AdminAdminsPage() {
 
   if (!isSuper) return <p className="rounded-md bg-white p-6 text-center text-slate-500">Bu bo‘lim faqat superadmin uchun</p>;
 
-  const valid = /^[a-z0-9._-]{3,32}$/.test(form.login.trim().toLowerCase()) && form.password.length >= 8 && form.name.trim() && /^\+998\d{9}$/.test(form.phone.replace(/\s/g, ''));
+  // Qaysi maydon noto'g'ri ekanini aniq aytadi (tugma indamay o'chib turmasin).
+  const problems = [
+    !/^[a-z0-9._-]{3,32}$/.test(form.login.trim().toLowerCase()) && 'Login: 3-32 ta lotin harf, raqam yoki . _ - (bo‘sh joysiz)',
+    form.password.length < 8 && 'Parol kamida 8 belgi bo‘lsin',
+    !form.name.trim() && 'Ismni kiriting',
+    !/^\+998\d{9}$/.test(form.phone.replace(/\s/g, '')) && 'Telefon +998XXXXXXXXX formatida',
+  ].filter(Boolean) as string[];
 
   return (
     <div className="flex flex-col gap-4">
@@ -88,7 +94,7 @@ export default function AdminAdminsPage() {
             <input className="input py-2" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} inputMode="tel" />
           </label>
         </div>
-        <button className="btn self-start py-2" disabled={!valid} onClick={create}>
+        <button className="btn self-start py-2" onClick={() => (problems.length ? setMsg({ ok: false, text: problems.join('. ') }) : create())}>
           Qo‘shish
         </button>
       </section>

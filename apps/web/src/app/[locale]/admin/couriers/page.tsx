@@ -36,13 +36,16 @@ const payload = (f: Partial<Form>) => ({
   pinfl: f.pinfl?.replace(/\s/g, '') || undefined,
 });
 
-const validNew = (f: Form) =>
-  /^\+998\d{9}$/.test(f.phone.replace(/\s/g, '')) &&
-  f.name.trim() !== '' &&
-  /^[a-z0-9._-]{3,32}$/.test(f.login.trim().toLowerCase()) &&
-  f.password.length >= 8 &&
-  /^[A-Z]{2}\d{7}$/.test(f.passport.replace(/\s/g, '').toUpperCase()) &&
-  /^\d{14}$/.test(f.pinfl);
+// Qaysi maydon noto'g'ri ekanini aniq aytadi (tugma indamay o'chib turmasin).
+const problems = (f: Form) =>
+  [
+    !/^[a-z0-9._-]{3,32}$/.test(f.login.trim().toLowerCase()) && 'Login: 3-32 ta lotin harf, raqam yoki . _ - (bo‘sh joysiz)',
+    f.password.length < 8 && 'Parol kamida 8 belgi bo‘lsin',
+    !/^[A-Z]{2}\d{7}$/.test(f.passport.replace(/\s/g, '').toUpperCase()) && 'Pasport: 2 ta harf va 7 ta raqam (AA1234567)',
+    !/^\d{14}$/.test(f.pinfl) && 'JSHSHIR 14 ta raqamdan iborat',
+    !/^\+998\d{9}$/.test(f.phone.replace(/\s/g, '')) && 'Telefon +998XXXXXXXXX formatida',
+    !f.name.trim() && 'Ism familiyani kiriting',
+  ].filter(Boolean) as string[];
 
 export default function AdminCouriersPage() {
   const [couriers, setCouriers] = useState<Courier[]>([]);
@@ -140,8 +143,11 @@ export default function AdminCouriersPage() {
         </div>
         <button
           className="btn self-start py-2"
-          disabled={!validNew(form)}
-          onClick={async () => (await save(form, `${form.name} kuryer qilib qo‘shildi`)) && setForm(EMPTY)}
+          onClick={async () => {
+            const errors = problems(form);
+            if (errors.length) return setMsg({ ok: false, text: errors.join('. ') });
+            if (await save(form, `${form.name} kuryer qilib qo‘shildi`)) setForm(EMPTY);
+          }}
         >
           Qo‘shish
         </button>
