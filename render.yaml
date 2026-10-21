@@ -36,7 +36,7 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: WEB_ORIGIN
-        value: https://vet-products-web.onrender.com,https://latipov.org.uz,https://www.latipov.org.uz,https://admin.latipov.org.uz,https://kuryer.latipov.org.uz
+        value: https://latipov.org.uz,https://www.latipov.org.uz,https://vet-products-web.onrender.com,https://admin.latipov.org.uz,https://kuryer.latipov.org.uz
       - key: JWT_ACCESS_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
