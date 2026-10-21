@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
+import { PasswordInput } from '@/components/PasswordInput';
 import { api, getSession } from '@/lib/client';
 import { date } from '@/lib/format';
 
@@ -76,7 +77,7 @@ export default function AdminAdminsPage() {
           </label>
           <label className="flex flex-col gap-1">
             Parol (kamida 8 belgi)
-            <input className="input py-2" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" />
+            <PasswordInput className="input py-2" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" />
           </label>
           <label className="flex flex-col gap-1">
             Ismi
