@@ -1,5 +1,5 @@
 'use client';
-import { Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { TelegramLogin } from '@/components/TelegramLogin';
@@ -53,6 +53,7 @@ interface LoginResponse {
 function PasswordLogin({ onDone }: { onDone: () => void }) {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
+  const [show, setShow] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -79,7 +80,23 @@ function PasswordLogin({ onDone }: { onDone: () => void }) {
       </label>
       <label className="flex flex-col gap-1 text-sm">
         Parol
-        <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+        <div className="relative">
+          <input
+            className="input pr-11"
+            type={show ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+          />
+          <button
+            type="button"
+            className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-400 hover:text-slate-700"
+            onClick={() => setShow(!show)}
+            aria-label={show ? 'Parolni yashirish' : 'Parolni ko‘rsatish'}
+          >
+            {show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+          </button>
+        </div>
       </label>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button className="btn py-3 text-base" disabled={!login.trim() || !password || busy}>
