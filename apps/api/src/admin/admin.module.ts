@@ -83,11 +83,16 @@ class ZoneDto {
   @IsOptional() @IsBoolean() active?: boolean;
 }
 
+// Yangi kuryer uchun login/parol majburiy; mavjud kuryerni tahrirlashda parol bo'sh qolsa o'zgarmaydi.
 class CourierDto {
-  @Matches(/^\+998\d{9}$/) phone: string;
-  @IsString() name: string;
+  @Matches(/^\+998\d{9}$/, { message: 'Telefon +998XXXXXXXXX formatida bo‘lishi kerak' }) phone: string;
+  @IsString() @MaxLength(100) name: string;
   @IsOptional() @IsInt() zoneId?: number;
   @IsOptional() @IsString() vehicleType?: string;
+  @IsOptional() @Matches(/^[a-z0-9._-]{3,32}$/, { message: 'Login: 3-32 ta kichik lotin harf, raqam yoki . _ -' }) login?: string;
+  @IsOptional() @IsString() @MinLength(8, { message: 'Parol kamida 8 belgi' }) @MaxLength(128) password?: string;
+  @IsOptional() @Matches(/^[A-Z]{2}\d{7}$/, { message: 'Pasport: 2 ta katta harf va 7 ta raqam (AA1234567)' }) passport?: string;
+  @IsOptional() @Matches(/^\d{14}$/, { message: 'JSHSHIR 14 ta raqamdan iborat' }) pinfl?: string;
 }
 
 class RoleDto {
@@ -257,15 +262,26 @@ class AdminController {
   async createCourier(@CurrentUser() user: AuthUser, @Body() dto: CourierDto) {
     const existing = await this.prisma.user.findUnique({ where: { phone: dto.phone } });
     if (existing?.role === 'ADMIN') throw new BadRequestException('Bu raqam administratorga tegishli, uni kuryer qilib bo‘lmaydi');
+    const isNew = existing?.role !== 'COURIER';
+    if (isNew && (!dto.login || !dto.password)) throw new BadRequestException('Yangi kuryer uchun login va parol kiriting');
+    if (dto.login) {
+      const taken = await this.prisma.user.findUnique({ where: { login: dto.login } });
+      if (taken && taken.phone !== dto.phone) throw new BadRequestException('Bu login band');
+    }
+    const credentials = {
+      ...(dto.login ? { login: dto.login } : {}),
+      ...(dto.password ? { passwordHash: await hashPassword(dto.password) } : {}),
+    };
     const u = await this.prisma.user.upsert({
       where: { phone: dto.phone },
-      update: { role: 'COURIER', name: dto.name },
-      create: { phone: dto.phone, name: dto.name, role: 'COURIER' },
+      update: { role: 'COURIER', name: dto.name, ...credentials },
+      create: { phone: dto.phone, name: dto.name, role: 'COURIER', ...credentials },
     });
+    const personal = { ...(dto.passport ? { passport: dto.passport } : {}), ...(dto.pinfl ? { pinfl: dto.pinfl } : {}) };
     const courier = await this.prisma.courier.upsert({
       where: { userId: u.id },
-      update: { zoneId: dto.zoneId, vehicleType: dto.vehicleType },
-      create: { userId: u.id, zoneId: dto.zoneId, vehicleType: dto.vehicleType },
+      update: { zoneId: dto.zoneId, vehicleType: dto.vehicleType, ...personal },
+      create: { userId: u.id, zoneId: dto.zoneId, vehicleType: dto.vehicleType, ...personal },
     });
     await this.audit(user, 'create', 'courier', courier.id);
     return courier;
@@ -276,9 +292,13 @@ class AdminController {
     if (id === user.id) throw new BadRequestException('O‘z rolingizni o‘zgartira olmaysiz');
     const target = await this.prisma.user.findUnique({ where: { id } });
     if (dto.role === 'ADMIN' || target?.role === 'ADMIN') throw new ForbiddenException('Adminlarni faqat superadmin boshqaradi');
-    const updated = await this.prisma.user.update({ where: { id }, data: { role: dto.role } });
+    // Xodimlikdan chiqarilganda login/parol ham o'chadi (panelga kira olmaydi).
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: { role: dto.role, ...(dto.role === 'CUSTOMER' ? { login: null, passwordHash: null } : {}) },
+    });
     await this.audit(user, 'set_role', 'user', id, { role: dto.role });
-    return updated;
+    return { id: updated.id, role: updated.role };
   }
 
   // Oddiy hisobot: kunlik sotuv (bekor qilinganlarsiz) va umumiy qoldiq.

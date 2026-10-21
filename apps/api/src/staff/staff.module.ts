@@ -114,7 +114,7 @@ class StaffController {
     return this.prisma.courier.findMany({
       where: { user: { role: 'COURIER' } },
       orderBy: { id: 'asc' },
-      include: { user: { select: { id: true, phone: true, name: true, telegramUsername: true } }, zone: true, _count: { select: { deliveries: { where: { status: { in: ['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'] } } } } } },
+      include: { user: { select: { id: true, phone: true, name: true, login: true, telegramUsername: true } }, zone: true, _count: { select: { deliveries: { where: { status: { in: ['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'] } } } } } },
     });
   }
 

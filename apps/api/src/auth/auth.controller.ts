@@ -11,8 +11,8 @@ class UpdateMeDto {
   @IsOptional() @IsIn(['uz', 'ru']) locale?: 'uz' | 'ru';
 }
 
-// Tokendagi ADMIN roli faqat parol bilan kirilganda beriladi.
-const viaOf = (user: AuthUser) => (user.role === 'ADMIN' ? 'password' : 'telegram');
+// Tokendagi xodim roli (ADMIN/COURIER) faqat parol bilan kirilganda beriladi.
+const viaOf = (user: AuthUser) => (user.role === 'CUSTOMER' ? 'telegram' : 'password');
 
 @Controller()
 export class AuthController {
@@ -45,9 +45,10 @@ export class AuthController {
   }
 
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
-  @Post('auth/admin/login')
-  adminLogin(@Body() dto: AdminLoginDto) {
-    return this.auth.adminLogin(dto.login, dto.password);
+  // Admin va kuryer paneli (auth/admin/login — eski nom, saqlab qolingan).
+  @Post(['auth/staff/login', 'auth/admin/login'])
+  staffLogin(@Body() dto: AdminLoginDto) {
+    return this.auth.staffLogin(dto.login, dto.password);
   }
 
   @Post('auth/refresh')

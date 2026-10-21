@@ -11,10 +11,10 @@ const MAX_ATTEMPTS = 5;
 // Token qanday olingan: admin huquqi faqat login/parol bilan kirilganda beriladi.
 type Via = 'password' | 'telegram';
 
-// Telegram orqali kirgan admin do'konda oddiy xaridor; admin paneli uchun parol kerak.
+// Xodimlar (admin, kuryer) faqat login/parol bilan kiradi; Telegram orqali kirgan xodim do'konda oddiy xaridor.
 function roleFor(user: User, via: Via): Role {
-  if (user.role !== 'ADMIN') return user.role;
-  return via === 'password' && user.passwordHash ? 'ADMIN' : 'CUSTOMER';
+  if (user.role === 'CUSTOMER') return user.role;
+  return via === 'password' && user.passwordHash ? user.role : 'CUSTOMER';
 }
 
 // Taxmin qilib bo'lmasin: login topilmasa ham xuddi shunday vaqt sarflanadi.
@@ -81,10 +81,10 @@ export class AuthService {
     return { user: publicUser(user, 'telegram'), ...this.issueTokens(user, 'telegram') };
   }
 
-  async adminLogin(login: string, password: string) {
+  async staffLogin(login: string, password: string) {
     const user = await this.prisma.user.findUnique({ where: { login: login.trim().toLowerCase() } });
     const ok = await verifyPassword(password, user?.passwordHash ?? (await DUMMY_HASH));
-    if (!user || !ok || user.role !== 'ADMIN') throw new UnauthorizedException('Login yoki parol noto‘g‘ri');
+    if (!user || !ok || user.role === 'CUSTOMER') throw new UnauthorizedException('Login yoki parol noto‘g‘ri');
     return { user: publicUser(user, 'password'), ...this.issueTokens(user, 'password') };
   }
 
@@ -109,6 +109,7 @@ export class AuthService {
 
 export function publicUser(u: User, via: Via = 'telegram') {
   const admin = roleFor(u, via) === 'ADMIN';
+  const staff = roleFor(u, via) !== 'CUSTOMER';
   return {
     id: u.id,
     phone: u.phone,
@@ -117,6 +118,7 @@ export function publicUser(u: User, via: Via = 'telegram') {
     locale: u.locale,
     telegramUsername: u.telegramUsername,
     telegramLinked: u.telegramId !== null,
-    ...(admin ? { login: u.login, superAdmin: u.superAdmin } : {}),
+    ...(staff ? { login: u.login } : {}),
+    ...(admin ? { superAdmin: u.superAdmin } : {}),
   };
 }

@@ -3,9 +3,8 @@ import { Loader2 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { PasswordInput } from '@/components/PasswordInput';
-import { TelegramLogin } from '@/components/TelegramLogin';
 import { api, setSession } from '@/lib/client';
-import { dict, type Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n';
 import type { Area } from './useBackstage';
 
 const TITLE: Record<Area, string> = { admin: 'Admin paneli', courier: 'Kuryer ilovasi' };
@@ -23,21 +22,16 @@ export function BackstageLogin({ area }: { area: Area }) {
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Vet Products · backstage</p>
           <h1 className="text-xl font-bold">{TITLE[area]}</h1>
         </div>
-        {area === 'admin' ? (
-          <PasswordLogin onDone={() => router.replace(`/${locale}/admin`)} />
-        ) : (
-          <TelegramLogin
-            t={dict(locale)}
-            onDone={(user) => {
-              if (user.role !== ROLE[area]) {
-                setSession(null);
-                setError(`${user.phone} raqamida bu bo‘limga ruxsat yo‘q. Administrator bilan bog‘laning.`);
-                return;
-              }
-              router.replace(`/${locale}/${area}`);
-            }}
-          />
-        )}
+        <PasswordLogin
+          onDone={(user) => {
+            if (user.role !== ROLE[area]) {
+              setSession(null);
+              setError('Bu akkauntda bu bo‘limga ruxsat yo‘q. Administrator bilan bog‘laning.');
+              return;
+            }
+            router.replace(`/${locale}/${area}`);
+          }}
+        />
         {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       </div>
     </div>
@@ -47,11 +41,11 @@ export function BackstageLogin({ area }: { area: Area }) {
 interface LoginResponse {
   accessToken: string;
   refreshToken: string;
-  user: { phone: string; role: string; login: string; superAdmin: boolean };
+  user: { phone: string; role: string; login: string; superAdmin?: boolean };
 }
 
-// Admin paneli: faqat login/parol (Telegram orqali admin huquqi berilmaydi).
-function PasswordLogin({ onDone }: { onDone: () => void }) {
+// Xodimlar (admin, kuryer) faqat login/parol bilan kiradi; Telegram orqali xodim huquqi berilmaydi.
+function PasswordLogin({ onDone }: { onDone: (user: LoginResponse['user']) => void }) {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -62,9 +56,9 @@ function PasswordLogin({ onDone }: { onDone: () => void }) {
     setError('');
     setBusy(true);
     try {
-      const r = await api<LoginResponse>('/auth/admin/login', { method: 'POST', body: { login, password } });
+      const r = await api<LoginResponse>('/auth/staff/login', { method: 'POST', body: { login, password } });
       setSession({ accessToken: r.accessToken, refreshToken: r.refreshToken, role: r.user.role, phone: r.user.phone, login: r.user.login, superAdmin: r.user.superAdmin });
-      onDone();
+      onDone(r.user);
     } catch (err) {
       setError((err as Error).message);
     } finally {

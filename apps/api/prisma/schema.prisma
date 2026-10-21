@@ -336,6 +336,9 @@ model Courier {
   zoneId      Int?
   vehicleType String        @default("avto")
   status      CourierStatus @default(OFFLINE)
+  // Shaxsiy ma'lumotlar (faqat adminlar ko'radi): pasport seriya+raqami va JSHSHIR (PINFL, 14 raqam).
+  passport    String?
+  pinfl       String?
 
   user       User            @relation(fields: [userId], references: [id])
   zone       DeliveryZone?   @relation(fields: [zoneId], references: [id])
