@@ -19,6 +19,13 @@ services:
     runtime: node
     plan: free
     region: frankfurt
+    # Faqat API (yoki umumiy lock fayl) o'zgarganda qayta deploy: web o'zgarishi API'ni uzib qo'ymasin.
+    buildFilter:
+      paths:
+        - apps/api/**
+        - package.json
+        - pnpm-lock.yaml
+        - render.yaml
     buildCommand: npm i -g pnpm@10.28.0 && pnpm install --frozen-lockfile --prod=false && pnpm --filter api exec prisma generate && pnpm --filter api build
     # Seed'lar upsert bilan yozilgan, qayta ishga tushirish xavfsiz.
     startCommand: cd apps/api && npx prisma migrate deploy && npx ts-node prisma/seed.ts && npx ts-node prisma/demo-catalog.ts && node dist/main.js
@@ -68,6 +75,12 @@ services:
     runtime: node
     plan: free
     region: frankfurt
+    buildFilter:
+      paths:
+        - apps/web/**
+        - package.json
+        - pnpm-lock.yaml
+        - render.yaml
     buildCommand: npm i -g pnpm@10.28.0 && pnpm install --frozen-lockfile --prod=false && pnpm --filter web build
     startCommand: cd apps/web && npx next start -p $PORT
     envVars:

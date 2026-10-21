@@ -1,5 +1,5 @@
 'use client';
-import { Banknote, CheckCircle2, MapPin, MessageSquare, Navigation, Package, Phone, Send, User } from 'lucide-react';
+import { Banknote, CheckCircle2, Loader2, MapPin, MessageSquare, Navigation, Package, Phone, RefreshCw, Send, User } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/client';
@@ -46,13 +46,24 @@ export default function CourierPage() {
   const [list, setList] = useState<Delivery[]>();
   const [shift, setShift] = useState<'ACTIVE' | 'OFFLINE' | null>(null);
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const load = useCallback(() => api<Delivery[]>('/courier/deliveries').then(setList).catch((e) => setError(e.message)), []);
+  // Ro'yxat va smena holati birga yangilanadi; xato bo'lsa ko'rsatiladi va "Yangilash" bilan qayta uriniladi.
+  const load = useCallback(async () => {
+    setBusy(true);
+    try {
+      const [deliveries, me] = await Promise.all([api<Delivery[]>('/courier/deliveries'), api<{ status: 'ACTIVE' | 'BUSY' | 'OFFLINE' }>('/courier/me')]);
+      setList(deliveries);
+      setShift(me.status === 'OFFLINE' ? 'OFFLINE' : 'ACTIVE');
+      setError('');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }, []);
   useEffect(() => {
     load();
-    api<{ status: 'ACTIVE' | 'BUSY' | 'OFFLINE' }>('/courier/me')
-      .then((c) => setShift(c.status === 'OFFLINE' ? 'OFFLINE' : 'ACTIVE'))
-      .catch(() => {});
     const id = setInterval(load, 60_000);
     return () => clearInterval(id);
   }, [load]);
@@ -73,17 +84,42 @@ export default function CourierPage() {
   };
 
   const setShiftStatus = async (s: 'ACTIVE' | 'OFFLINE') => {
-    await api('/courier/status', { method: 'POST', body: { status: s } });
+    if (s === shift) return;
+    const prev = shift;
     setShift(s);
+    setError('');
+    try {
+      await api('/courier/status', { method: 'POST', body: { status: s } });
+    } catch (e) {
+      setShift(prev);
+      setError((e as Error).message);
+    }
   };
 
-  if (!list) return error ? <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p> : null;
+  const refresh = (
+    <button className="btn-soft py-2" onClick={load} disabled={busy}>
+      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+      {t.refresh}
+    </button>
+  );
+
+  if (!list) {
+    return (
+      <div className="flex flex-col items-center gap-3 p-10">
+        {error ? <p className="w-full rounded-lg bg-red-50 p-3 text-center text-red-700">{error}</p> : <Loader2 className="h-6 w-6 animate-spin text-slate-400" />}
+        {error && refresh}
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <h1 className="flex-1 text-lg font-bold">
           {t.title} <span className="text-slate-400">{list.length}</span>
         </h1>
+        <button className="rounded-lg bg-white p-2 text-slate-600 shadow-sm disabled:opacity-50" onClick={load} disabled={busy} aria-label={t.refresh}>
+          <RefreshCw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} />
+        </button>
         <div className="flex rounded-lg bg-white p-0.5 text-xs font-semibold shadow-sm">
           {(['ACTIVE', 'OFFLINE'] as const).map((s) => (
             <button key={s} onClick={() => setShiftStatus(s)} className={`rounded-md px-2.5 py-1.5 ${shift === s ? (s === 'ACTIVE' ? 'bg-brand-600 text-white' : 'bg-slate-700 text-white') : 'text-slate-600'}`}>
@@ -97,9 +133,7 @@ export default function CourierPage() {
         <div className="flex flex-col items-center gap-2 rounded-2xl bg-white p-10 text-center text-slate-500">
           <CheckCircle2 className="h-10 w-10 text-brand-500" />
           {t.none}
-          <button className="btn-soft mt-2" onClick={load}>
-            {t.refresh}
-          </button>
+          <div className="mt-2">{refresh}</div>
         </div>
       )}
 

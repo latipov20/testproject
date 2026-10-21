@@ -67,7 +67,8 @@ class CourierController {
   @Post('status')
   async setStatus(@CurrentUser() user: AuthUser, @Body() dto: CourierStatusDto) {
     const courier = await this.me(user);
-    return this.prisma.courier.update({ where: { id: courier.id }, data: { status: dto.status } });
+    const updated = await this.prisma.courier.update({ where: { id: courier.id }, data: { status: dto.status } });
+    return { id: updated.id, status: updated.status };
   }
 
   @Post('deliveries/:id/status')

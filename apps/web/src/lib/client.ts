@@ -40,11 +40,20 @@ export class ApiError extends Error {
   }
 }
 
+async function fetchOrFail(url: string, init: RequestInit) {
+  try {
+    return await fetch(url, init);
+  } catch {
+    throw new ApiError(0, 'Server bilan aloqa yo‘q. Birozdan keyin qayta urinib ko‘ring.');
+  }
+}
+
 export async function api<T = any>(path: string, opts: { method?: string; body?: unknown; locale?: string } = {}): Promise<T> {
   // FormData (fayl yuklash) bo'lsa, content-type'ni brauzer o'zi qo'yadi.
   const isForm = opts.body instanceof FormData;
+  // Tarmoq xatosi (server uyg'onyapti, deploy, internet yo'q) tushunarli matnga aylanadi.
   const doFetch = (token?: string) =>
-    fetch(API + path, {
+    fetchOrFail(API + path, {
       method: opts.method ?? 'GET',
       headers: {
         ...(isForm ? {} : { 'content-type': 'application/json' }),
@@ -57,7 +66,7 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
   const session = getSession();
   let res = await doFetch(session?.accessToken);
   if (res.status === 401 && session?.refreshToken) {
-    const r = await fetch(API + '/auth/refresh', {
+    const r = await fetchOrFail(API + '/auth/refresh', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ refreshToken: session.refreshToken }),
