@@ -1,8 +1,9 @@
 'use client';
+import { Loader2 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { TelegramLogin } from '@/components/TelegramLogin';
-import { setSession } from '@/lib/client';
+import { api, setSession } from '@/lib/client';
 import { dict, type Locale } from '@/lib/i18n';
 import type { Area } from './useBackstage';
 
@@ -21,19 +22,70 @@ export function BackstageLogin({ area }: { area: Area }) {
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Vet Products · backstage</p>
           <h1 className="text-xl font-bold">{TITLE[area]}</h1>
         </div>
-        <TelegramLogin
-          t={dict(locale)}
-          onDone={(user) => {
-            if (user.role !== ROLE[area]) {
-              setSession(null);
-              setError(`${user.phone} raqamida bu bo‘limga ruxsat yo‘q. Administrator bilan bog‘laning.`);
-              return;
-            }
-            router.replace(`/${locale}/${area}`);
-          }}
-        />
+        {area === 'admin' ? (
+          <PasswordLogin onDone={() => router.replace(`/${locale}/admin`)} />
+        ) : (
+          <TelegramLogin
+            t={dict(locale)}
+            onDone={(user) => {
+              if (user.role !== ROLE[area]) {
+                setSession(null);
+                setError(`${user.phone} raqamida bu bo‘limga ruxsat yo‘q. Administrator bilan bog‘laning.`);
+                return;
+              }
+              router.replace(`/${locale}/${area}`);
+            }}
+          />
+        )}
         {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       </div>
     </div>
+  );
+}
+
+interface LoginResponse {
+  accessToken: string;
+  refreshToken: string;
+  user: { phone: string; role: string; login: string; superAdmin: boolean };
+}
+
+// Admin paneli: faqat login/parol (Telegram orqali admin huquqi berilmaydi).
+function PasswordLogin({ onDone }: { onDone: () => void }) {
+  const [login, setLogin] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      const r = await api<LoginResponse>('/auth/admin/login', { method: 'POST', body: { login, password } });
+      setSession({ accessToken: r.accessToken, refreshToken: r.refreshToken, role: r.user.role, phone: r.user.phone, login: r.user.login, superAdmin: r.user.superAdmin });
+      onDone();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="flex flex-col gap-3" onSubmit={submit}>
+      <label className="flex flex-col gap-1 text-sm">
+        Login
+        <input className="input" value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" autoCapitalize="none" autoFocus />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Parol
+        <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+      </label>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button className="btn py-3 text-base" disabled={!login.trim() || !password || busy}>
+        {busy && <Loader2 className="h-5 w-5 animate-spin" />}
+        Kirish
+      </button>
+    </form>
   );
 }

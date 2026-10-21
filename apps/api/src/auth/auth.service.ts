@@ -1,11 +1,24 @@
 import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { User } from '@prisma/client';
+import { Role, User } from '@prisma/client';
 import { randomBytes, randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { hashPassword, verifyPassword } from './password';
 import { hash, LOGIN_TTL_MS, TelegramService } from './telegram.service';
 
 const MAX_ATTEMPTS = 5;
+
+// Token qanday olingan: admin huquqi faqat login/parol bilan kirilganda beriladi.
+type Via = 'password' | 'telegram';
+
+// Telegram orqali kirgan admin do'konda oddiy xaridor; admin paneli uchun parol kerak.
+function roleFor(user: User, via: Via): Role {
+  if (user.role !== 'ADMIN') return user.role;
+  return via === 'password' && user.passwordHash ? 'ADMIN' : 'CUSTOMER';
+}
+
+// Taxmin qilib bo'lmasin: login topilmasa ham xuddi shunday vaqt sarflanadi.
+const DUMMY_HASH = hashPassword(randomBytes(16).toString('hex'));
 
 @Injectable()
 export class AuthService {
@@ -65,21 +78,28 @@ export class AuthService {
     const user = existing
       ? await this.prisma.user.update({ where: { id: existing.id }, data: { ...tg, name: existing.name ?? name } })
       : await this.prisma.user.create({ data: { phone: login.phone, name, ...tg } });
-    return { user: publicUser(user), ...this.issueTokens(user) };
+    return { user: publicUser(user, 'telegram'), ...this.issueTokens(user, 'telegram') };
+  }
+
+  async adminLogin(login: string, password: string) {
+    const user = await this.prisma.user.findUnique({ where: { login: login.trim().toLowerCase() } });
+    const ok = await verifyPassword(password, user?.passwordHash ?? (await DUMMY_HASH));
+    if (!user || !ok || user.role !== 'ADMIN') throw new UnauthorizedException('Login yoki parol noto‘g‘ri');
+    return { user: publicUser(user, 'password'), ...this.issueTokens(user, 'password') };
   }
 
   async refresh(refreshToken: string) {
     try {
       const payload = this.jwt.verify(refreshToken, { secret: process.env.JWT_REFRESH_SECRET });
       const user = await this.prisma.user.findUniqueOrThrow({ where: { id: payload.sub } });
-      return this.issueTokens(user);
+      return this.issueTokens(user, payload.via === 'password' ? 'password' : 'telegram');
     } catch {
       throw new UnauthorizedException();
     }
   }
 
-  private issueTokens(user: User) {
-    const payload = { sub: user.id, role: user.role };
+  private issueTokens(user: User, via: Via) {
+    const payload = { sub: user.id, role: roleFor(user, via), via };
     return {
       accessToken: this.jwt.sign(payload, { secret: process.env.JWT_ACCESS_SECRET, expiresIn: '1h' }),
       refreshToken: this.jwt.sign(payload, { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '30d' }),
@@ -87,6 +107,16 @@ export class AuthService {
   }
 }
 
-export function publicUser(u: User) {
-  return { id: u.id, phone: u.phone, name: u.name, role: u.role, locale: u.locale, telegramUsername: u.telegramUsername, telegramLinked: u.telegramId !== null };
+export function publicUser(u: User, via: Via = 'telegram') {
+  const admin = roleFor(u, via) === 'ADMIN';
+  return {
+    id: u.id,
+    phone: u.phone,
+    name: u.name,
+    role: roleFor(u, via),
+    locale: u.locale,
+    telegramUsername: u.telegramUsername,
+    telegramLinked: u.telegramId !== null,
+    ...(admin ? { login: u.login, superAdmin: u.superAdmin } : {}),
+  };
 }

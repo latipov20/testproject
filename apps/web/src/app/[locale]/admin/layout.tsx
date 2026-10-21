@@ -1,5 +1,5 @@
 'use client';
-import { Boxes, ClipboardList, ExternalLink, FolderTree, LogOut, Menu, Package, Truck, X } from 'lucide-react';
+import { Boxes, ClipboardList, ExternalLink, FolderTree, LogOut, Menu, Package, ShieldCheck, Truck, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import { useState } from 'react';
@@ -14,6 +14,8 @@ const NAV = [
   { href: '/stock', label: 'Ombor', icon: Boxes },
   { href: '/couriers', label: 'Kuryerlar', icon: Truck },
 ];
+// Faqat superadmin ko'radi.
+const SUPER_NAV = [{ href: '/admins', label: 'Adminlar', icon: ShieldCheck }];
 
 // admin.latipov.org.uz da do'kon asosiy domenda: birinchi qismni olib tashlaymiz.
 function siteOrigin() {
@@ -44,7 +46,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const nav = (
     <nav className="flex flex-col gap-1">
-      {NAV.map(({ href, label, icon: Icon }) => {
+      {[...NAV, ...(session.superAdmin ? SUPER_NAV : [])].map(({ href, label, icon: Icon }) => {
         const full = base + href;
         const active = href ? pathname.startsWith(full) : pathname === base;
         return (
@@ -75,7 +77,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
         {nav}
         <div className="mt-auto flex flex-col gap-1 border-t border-white/10 pt-4 text-slate-400">
-          <span className="px-3 text-xs">{session.phone}</span>
+          <span className="px-3 text-xs">{session.login ?? session.phone}</span>
           <a href={`${siteOrigin()}/${locale}`} target="_blank" className="flex items-center gap-3 rounded-lg px-3 py-2 hover:text-white">
             <ExternalLink className="h-4 w-4" /> Saytni ochish
           </a>

@@ -9,6 +9,9 @@ export interface Session {
   refreshToken: string;
   role: string;
   phone: string;
+  // Faqat admin paneliga login/parol bilan kirganda.
+  login?: string;
+  superAdmin?: boolean;
 }
 
 export function getSession(): Session | null {

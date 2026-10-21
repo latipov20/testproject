@@ -1,6 +1,7 @@
 // Boshlang'ich ma'lumotlar: kategoriyalar, hayvon turlari, hududlar, xodimlar va namuna mahsulotlar.
 // Mahsulotlar va yetkazish narxlari NAMUNA — haqiqiy ro'yxat bilan almashtiriladi.
 import { PrismaClient } from '@prisma/client';
+import { hashPassword } from '../src/auth/password';
 
 const prisma = new PrismaClient();
 
@@ -181,13 +182,19 @@ async function main() {
     });
   }
 
-  // Admin: o'z Telegram raqamingiz bilan kirish uchun ADMIN_PHONE=+998XXXXXXXXX bilan ishga tushiring.
+  // Superadmin: admin paneliga SUPERADMIN_LOGIN / SUPERADMIN_PASSWORD bilan kiradi (har startda env'dan yangilanadi).
+  // Ular berilmasa admin yaratiladi, lekin parolsiz — panelga kirib bo'lmaydi.
   const adminPhone = process.env.ADMIN_PHONE || '+998900000001';
+  const login = process.env.SUPERADMIN_LOGIN?.trim().toLowerCase();
+  const password = process.env.SUPERADMIN_PASSWORD;
+  const credentials = login && password ? { login, passwordHash: await hashPassword(password) } : {};
+  if (login) await prisma.user.updateMany({ where: { login, NOT: { phone: adminPhone } }, data: { login: null } });
   const admin = await prisma.user.upsert({
     where: { phone: adminPhone },
-    update: { role: 'ADMIN' },
-    create: { phone: adminPhone, name: 'Admin', role: 'ADMIN' },
+    update: { role: 'ADMIN', superAdmin: true, ...credentials },
+    create: { phone: adminPhone, name: 'Admin', role: 'ADMIN', superAdmin: true, ...credentials },
   });
+  if (!login || !password) console.warn('SUPERADMIN_LOGIN/SUPERADMIN_PASSWORD berilmagan: admin paneliga kirib bo‘lmaydi');
   const courierUser = await prisma.user.upsert({
     where: { phone: '+998900000003' },
     update: { role: 'COURIER' },

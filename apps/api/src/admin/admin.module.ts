@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Module,
   NotFoundException,
@@ -30,11 +31,13 @@ import {
   Matches,
   MaxLength,
   Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { hashPassword } from '../auth/password';
 import { AuthGuard, AuthUser, CurrentUser, Roles } from '../common/auth';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -89,6 +92,13 @@ class CourierDto {
 
 class RoleDto {
   @IsEnum(Role) role: Role;
+}
+
+class AdminAccountDto {
+  @Matches(/^[a-z0-9._-]{3,32}$/, { message: 'Login: 3-32 ta kichik lotin harf, raqam yoki . _ -' }) login: string;
+  @IsString() @MinLength(8, { message: 'Parol kamida 8 belgi' }) @MaxLength(128) password: string;
+  @IsString() @MaxLength(100) name: string;
+  @Matches(/^\+998\d{9}$/, { message: 'Telefon +998XXXXXXXXX formatida bo‘lishi kerak' }) phone: string;
 }
 
 class CategoryDto {
@@ -264,6 +274,8 @@ class AdminController {
   @Patch('users/:id/role')
   async setRole(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number, @Body() dto: RoleDto) {
     if (id === user.id) throw new BadRequestException('O‘z rolingizni o‘zgartira olmaysiz');
+    const target = await this.prisma.user.findUnique({ where: { id } });
+    if (dto.role === 'ADMIN' || target?.role === 'ADMIN') throw new ForbiddenException('Adminlarni faqat superadmin boshqaradi');
     const updated = await this.prisma.user.update({ where: { id }, data: { role: dto.role } });
     await this.audit(user, 'set_role', 'user', id, { role: dto.role });
     return updated;
@@ -352,5 +364,55 @@ function dbError(e: unknown): never {
   throw e;
 }
 
-@Module({ controllers: [AdminController] })
+// Adminlar: faqat superadmin qo'shadi va chiqaradi. Admin panelga login/parol bilan kiriladi.
+@UseGuards(AuthGuard)
+@Roles('ADMIN')
+@Controller('admin/admins')
+class AdminAccountsController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  private async requireSuper(user: AuthUser) {
+    const me = await this.prisma.user.findUnique({ where: { id: user.id } });
+    if (!me?.superAdmin) throw new ForbiddenException('Faqat superadmin uchun');
+  }
+
+  @Get()
+  async list(@CurrentUser() user: AuthUser) {
+    await this.requireSuper(user);
+    return this.prisma.user.findMany({
+      where: { role: 'ADMIN', passwordHash: { not: null } },
+      select: { id: true, login: true, name: true, phone: true, superAdmin: true, createdAt: true },
+      orderBy: { id: 'asc' },
+    });
+  }
+
+  // Shu telefon bilan xaridor bo'lsa, o'sha akkaunt admin qilinadi.
+  @Post()
+  async create(@CurrentUser() user: AuthUser, @Body() dto: AdminAccountDto) {
+    await this.requireSuper(user);
+    const taken = await this.prisma.user.findUnique({ where: { login: dto.login } });
+    if (taken && taken.phone !== dto.phone) throw new BadRequestException('Bu login band');
+    const existing = await this.prisma.user.findUnique({ where: { phone: dto.phone } });
+    if (existing?.superAdmin) throw new BadRequestException('Bu raqam superadminga tegishli');
+    if (existing?.role === 'COURIER') throw new BadRequestException('Bu raqam kuryerga tegishli, avval kuryerlikdan chiqaring');
+    const data = { login: dto.login, passwordHash: await hashPassword(dto.password), name: dto.name, role: 'ADMIN' as const };
+    const u = await this.prisma.user.upsert({ where: { phone: dto.phone }, update: data, create: { ...data, phone: dto.phone } });
+    await this.prisma.auditLog.create({ data: { actorId: user.id, action: 'create', entity: 'admin', entityId: u.id } });
+    return { id: u.id, login: u.login, name: u.name, phone: u.phone, superAdmin: u.superAdmin, createdAt: u.createdAt };
+  }
+
+  // Admin oddiy xaridorga aylanadi, paroli o'chiriladi (amaldagi tokeni 1 soat ichida tugaydi).
+  @Delete(':id')
+  async remove(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+    await this.requireSuper(user);
+    const target = await this.prisma.user.findUnique({ where: { id } });
+    if (!target || target.role !== 'ADMIN') throw new NotFoundException();
+    if (target.superAdmin) throw new BadRequestException('Superadminni o‘chirib bo‘lmaydi');
+    await this.prisma.user.update({ where: { id }, data: { role: 'CUSTOMER', login: null, passwordHash: null } });
+    await this.prisma.auditLog.create({ data: { actorId: user.id, action: 'remove', entity: 'admin', entityId: id } });
+    return { ok: true };
+  }
+}
+
+@Module({ controllers: [AdminController, AdminAccountsController] })
 export class AdminModule {}

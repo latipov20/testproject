@@ -45,6 +45,11 @@ services:
         sync: false
       - key: ADMIN_PHONE
         sync: false
+      # Admin paneliga kirish (superadmin). Har startda shu qiymatlardan yangilanadi.
+      - key: SUPERADMIN_LOGIN
+        sync: false
+      - key: SUPERADMIN_PASSWORD
+        sync: false
       - key: PAYME_MERCHANT_ID
         sync: false
       - key: PAYME_KEY

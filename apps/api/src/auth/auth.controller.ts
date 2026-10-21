@@ -3,13 +3,16 @@ import { Throttle } from '@nestjs/throttler';
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { AuthGuard, AuthUser, CurrentUser } from '../common/auth';
 import { PrismaService } from '../prisma/prisma.service';
-import { RefreshDto, TelegramDevContactDto, TelegramTokenDto, TelegramVerifyDto } from './auth.dto';
+import { AdminLoginDto, RefreshDto, TelegramDevContactDto, TelegramTokenDto, TelegramVerifyDto } from './auth.dto';
 import { AuthService, publicUser } from './auth.service';
 
 class UpdateMeDto {
   @IsOptional() @IsString() @MaxLength(100) name?: string;
   @IsOptional() @IsIn(['uz', 'ru']) locale?: 'uz' | 'ru';
 }
+
+// Tokendagi ADMIN roli faqat parol bilan kirilganda beriladi.
+const viaOf = (user: AuthUser) => (user.role === 'ADMIN' ? 'password' : 'telegram');
 
 @Controller()
 export class AuthController {
@@ -41,6 +44,12 @@ export class AuthController {
     return this.auth.verifyTelegram(dto.token, dto.code);
   }
 
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  @Post('auth/admin/login')
+  adminLogin(@Body() dto: AdminLoginDto) {
+    return this.auth.adminLogin(dto.login, dto.password);
+  }
+
   @Post('auth/refresh')
   refresh(@Body() dto: RefreshDto) {
     return this.auth.refresh(dto.refreshToken);
@@ -50,12 +59,12 @@ export class AuthController {
   @Get('me')
   async me(@CurrentUser() user: AuthUser) {
     const u = await this.prisma.user.findUniqueOrThrow({ where: { id: user.id }, include: { addresses: { include: { zone: true } } } });
-    return { ...publicUser(u), addresses: u.addresses };
+    return { ...publicUser(u, viaOf(user)), addresses: u.addresses };
   }
 
   @UseGuards(AuthGuard)
   @Patch('me')
   async updateMe(@CurrentUser() user: AuthUser, @Body() dto: UpdateMeDto) {
-    return publicUser(await this.prisma.user.update({ where: { id: user.id }, data: dto }));
+    return publicUser(await this.prisma.user.update({ where: { id: user.id }, data: dto }), viaOf(user));
   }
 }

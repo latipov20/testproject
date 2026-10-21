@@ -82,6 +82,10 @@ model User {
   // Telegram bot orqali tasdiqlangan akkaunt: telefon raqam botdagi "raqamni yuborish" orqali olinadi.
   telegramId       BigInt? @unique
   telegramUsername String?
+  // Admin paneliga faqat login/parol bilan kiriladi; superadmin boshqa adminlarni qo'shadi.
+  login        String? @unique
+  passwordHash String?
+  superAdmin   Boolean @default(false)
   createdAt DateTime @default(now())
 
   addresses Address[]
