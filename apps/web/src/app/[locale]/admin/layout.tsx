@@ -15,6 +15,12 @@ const NAV = [
   { href: '/couriers', label: 'Kuryerlar', icon: Truck },
 ];
 
+// admin.latipov.org.uz da do'kon asosiy domenda: birinchi qismni olib tashlaymiz.
+function siteOrigin() {
+  const { protocol, host, hostname } = window.location;
+  return hostname.startsWith('admin.') ? `${protocol}//${host.slice('admin.'.length)}` : '';
+}
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { locale } = useParams<{ locale: string }>();
   const pathname = usePathname();
@@ -70,9 +76,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {nav}
         <div className="mt-auto flex flex-col gap-1 border-t border-white/10 pt-4 text-slate-400">
           <span className="px-3 text-xs">{session.phone}</span>
-          <Link href={`/${locale}`} target="_blank" className="flex items-center gap-3 rounded-lg px-3 py-2 hover:text-white">
+          <a href={`${siteOrigin()}/${locale}`} target="_blank" className="flex items-center gap-3 rounded-lg px-3 py-2 hover:text-white">
             <ExternalLink className="h-4 w-4" /> Saytni ochish
-          </Link>
+          </a>
           <button onClick={() => setSession(null)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-left hover:text-white">
             <LogOut className="h-4 w-4" /> Chiqish
           </button>

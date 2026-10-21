@@ -36,7 +36,7 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: WEB_ORIGIN
-        value: https://vet-products-web.onrender.com,https://latipov.org.uz
+        value: https://vet-products-web.onrender.com,https://latipov.org.uz,https://www.latipov.org.uz,https://admin.latipov.org.uz,https://kuryer.latipov.org.uz
       - key: JWT_ACCESS_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
@@ -73,3 +73,8 @@ services:
         value: https://vet-products-api.onrender.com/v1
       - key: NEXT_PUBLIC_API_URL
         value: https://vet-products-api.onrender.com/v1
+      # Backstage subdomenlari: shu hostdan kirilsa faqat admin / kuryer bo'limi ochiladi.
+      - key: ADMIN_HOST
+        value: admin.latipov.org.uz
+      - key: COURIER_HOST
+        value: kuryer.latipov.org.uz
