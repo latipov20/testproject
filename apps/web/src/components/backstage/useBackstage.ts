@@ -1,7 +1,7 @@
 'use client';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { getSession, type Session } from '@/lib/client';
+import { getSession, sessionKey, type Session } from '@/lib/client';
 
 export type Area = 'admin' | 'courier';
 const ROLE: Record<Area, string> = { admin: 'ADMIN', courier: 'COURIER' };
@@ -28,8 +28,14 @@ export function useBackstage(area: Area, enabled = true) {
       }
     };
     sync();
+    // Boshqa tabda shu bo'limdan chiqilsa yoki qayta kirilsa, bu tab ham moslashadi.
+    const onStorage = (e: StorageEvent) => e.key === sessionKey() && sync();
     window.addEventListener('session', sync);
-    return () => window.removeEventListener('session', sync);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('session', sync);
+      window.removeEventListener('storage', onStorage);
+    };
   }, [area, enabled, locale, router]);
 
   return { session, denied };

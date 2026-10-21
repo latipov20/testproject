@@ -14,9 +14,16 @@ export interface Session {
   superAdmin?: boolean;
 }
 
+// Admin, kuryer va do'kon sessiyalari alohida saqlanadi: bitta brauzerda (bir xil domenda ham)
+// admin va kuryer bo'lib kirilsa, biri ikkinchisining tokenini ustidan yozmaydi.
+export function sessionKey() {
+  const area = location.pathname.match(/^\/[a-z]{2}\/(admin|courier)(\/|$)/)?.[1];
+  return area ? `session:${area}` : 'session';
+}
+
 export function getSession(): Session | null {
   try {
-    const raw = localStorage.getItem('session');
+    const raw = localStorage.getItem(sessionKey());
     return raw ? (JSON.parse(raw) as Session) : null;
   } catch {
     return null;
@@ -25,8 +32,8 @@ export function getSession(): Session | null {
 
 export function setSession(s: Session | null) {
   try {
-    if (s) localStorage.setItem('session', JSON.stringify(s));
-    else localStorage.removeItem('session');
+    if (s) localStorage.setItem(sessionKey(), JSON.stringify(s));
+    else localStorage.removeItem(sessionKey());
   } catch {}
   window.dispatchEvent(new Event('session'));
 }
