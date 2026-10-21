@@ -23,6 +23,10 @@ function LoginForm() {
             router.push(next.startsWith('/') && !next.startsWith('//') ? next : `/${locale}`);
           }}
         />
+        {/* Adminlar Telegram bilan emas, login/parol bilan kiradi (asosiy domendan admin subdomeniga o'tadi). */}
+        <a href={`/${locale}/admin/login`} className="border-t border-slate-100 pt-4 text-center text-sm text-slate-500 hover:text-slate-800">
+          {t.staffLogin}
+        </a>
       </div>
     </div>
   );
