@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Global, Module, NotFoundException, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Global, Module, NotFoundException, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
 import { PaymentMethod } from '@prisma/client';
 import { IsEnum, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
 import { AuthGuard, AuthUser, CurrentUser } from '../common/auth';
+import { paymentMethods } from '../payments/payments.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrdersService } from './orders.service';
 
@@ -21,6 +22,7 @@ class OrdersController {
 
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateOrderDto) {
+    if (!paymentMethods().includes(dto.paymentMethod)) throw new BadRequestException('Bu to‘lov usuli hozircha ulanmagan');
     return this.orders.createFromCart(user.id, dto.addressId, dto.paymentMethod, dto.comment);
   }
 

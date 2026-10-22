@@ -1,5 +1,5 @@
 // To'liq oqimni tekshiradi: xaridor -> buyurtma -> admin -> kuryer -> yetkazildi, hamda Payme JSON-RPC.
-// Ishga tushirish: API ishlab turgan bo'lishi kerak (AUTH_DEV_MODE=true, PAYME_KEY o'rnatilgan).
+// Ishga tushirish: API ishlab turgan bo'lishi kerak (AUTH_DEV_MODE=true, PAYME_KEY va PAYME_MERCHANT_ID o'rnatilgan: aks holda Payme buyurtmasi rad etiladi).
 import assert from 'node:assert/strict';
 
 const API = process.env.API_URL ?? 'http://localhost:4000/v1';

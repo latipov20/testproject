@@ -62,7 +62,7 @@ Seed yaratgan sinov akkauntlari (sinov rejimida shu raqamlar bilan kiriladi):
 ## Tekshirish
 
 ```bash
-# API ishlab turganda (AUTH_DEV_MODE=true): kirish -> buyurtma -> FEFO -> admin -> kuryer -> Payme
+# API ishlab turganda (AUTH_DEV_MODE=true, .env da PAYME_KEY va PAYME_MERCHANT_ID): kirish -> buyurtma -> FEFO -> admin -> kuryer -> Payme
 PAYME_KEY=<.env dagi kalit> pnpm --filter api test:e2e
 ```
 
@@ -87,6 +87,8 @@ Serverda sinov rejimi o'chiq (`NODE_ENV=production`): kirish uchun bot tokeni sh
 | Click (SHOP API, `/v1/webhooks/click/prepare` va `/complete`) | Yozilgan, sandbox'da sinash kerak |
 | Telegram bot «Vet Register» (kirish) | Yozilgan, `TELEGRAM_BOT_TOKEN` kerak |
 | Fiskal chek, xarita | Hali yo'q |
+
+Payme/Click kalitlari berilmagan bo'lsa, rasmiylashtirishda bu usullar ko'rinmaydi va API ular bilan buyurtma qabul qilmaydi (`GET /v1/payments/methods`).
 
 ## Keyingi qadamlar
 

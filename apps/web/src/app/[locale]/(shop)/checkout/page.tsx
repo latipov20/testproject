@@ -29,6 +29,7 @@ export default function CheckoutPage() {
   const session = useAuthed();
   const [zones, setZones] = useState<Zone[]>([]);
   const [cart, setCart] = useState<Cart>();
+  const [methods, setMethods] = useState<string[]>(['CASH']);
   const [loadError, setLoadError] = useState(false);
   const [form, setForm] = useState({ zoneId: 0, street: '', landmark: '', paymentMethod: 'CASH', comment: '' });
   const [error, setError] = useState('');
@@ -37,8 +38,9 @@ export default function CheckoutPage() {
   // Savat va hududlar birga yuklanadi. Xato bo'lsa (server uyg'onyapti) jim qolmaydi: qayta urinish tugmasi chiqadi.
   const load = useCallback(() => {
     setLoadError(false);
-    Promise.all([api<Zone[]>('/delivery-zones', { locale }), api<Cart>('/cart', { locale })])
-      .then(([z, c]) => {
+    Promise.all([api<Zone[]>('/delivery-zones', { locale }), api<Cart>('/cart', { locale }), api<string[]>('/payments/methods')])
+      .then(([z, c, m]) => {
+        setMethods(m);
         setZones(z);
         setForm((f) => ({ ...f, zoneId: f.zoneId || z[0]?.id || 0 }));
         setCart(c);
@@ -69,10 +71,13 @@ export default function CheckoutPage() {
         body: { addressId: address.id, paymentMethod: form.paymentMethod, comment: form.comment || undefined },
       });
       refreshShop();
+      // Buyurtma yaratildi, savat bo'shadi: to'lov boshlanmasa ham xaridor buyurtma sahifasiga o'tadi (u yerda qayta to'lash mumkin).
       if (form.paymentMethod !== 'CASH') {
-        const { url } = await api(`/payments/${order.id}/init`, { method: 'POST', body: {} });
-        location.href = url;
-        return;
+        try {
+          const { url } = await api(`/payments/${order.id}/init`, { method: 'POST', body: {} });
+          location.href = url;
+          return;
+        } catch {}
       }
       router.push(`/${locale}/orders/${order.id}`);
     } catch (e) {
@@ -135,7 +140,9 @@ export default function CheckoutPage() {
             ['CASH', t.cash],
             ['PAYME', 'Payme'],
             ['CLICK', 'Click'],
-          ].map(([value, label]) => (
+          ]
+            .filter(([value]) => methods.includes(value))
+            .map(([value, label]) => (
             <label key={value} className={`card flex cursor-pointer items-center gap-3 p-3 ${form.paymentMethod === value ? 'border-brand-600' : ''}`}>
               <input type="radio" name="pm" value={value} checked={form.paymentMethod === value} onChange={set('paymentMethod')} />
               {label}

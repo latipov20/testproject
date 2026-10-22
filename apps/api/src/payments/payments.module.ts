@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Module, NotFoundException, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Module, NotFoundException, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
 import { IsOptional, IsUrl } from 'class-validator';
 import { AuthGuard, AuthUser, CurrentUser } from '../common/auth';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,6 +7,22 @@ import { PaymeController } from './payme.controller';
 
 class InitDto {
   @IsOptional() @IsUrl({ require_tld: false }) returnUrl?: string;
+}
+
+// Kalitlari berilmagan to'lov tizimi taklif qilinmaydi: aks holda buyurtma yaratilib, to'lov sahifasi xato beradi.
+const configured = {
+  PAYME: () => Boolean(process.env.PAYME_MERCHANT_ID && process.env.PAYME_KEY),
+  CLICK: () => Boolean(process.env.CLICK_SERVICE_ID && process.env.CLICK_MERCHANT_ID && process.env.CLICK_SECRET_KEY),
+};
+
+export const paymentMethods = () => ['CASH', ...(['PAYME', 'CLICK'] as const).filter((m) => configured[m]())];
+
+@Controller('payments')
+class PaymentMethodsController {
+  @Get('methods')
+  methods() {
+    return paymentMethods();
+  }
 }
 
 @UseGuards(AuthGuard)
@@ -20,6 +36,9 @@ class PaymentsController {
     const order = await this.prisma.order.findFirst({ where: { id: orderId, userId: user.id } });
     if (!order) throw new NotFoundException();
     if (order.status === 'CANCELLED') throw new BadRequestException('Buyurtma bekor qilingan');
+    if (order.paymentMethod !== 'CASH' && !configured[order.paymentMethod]()) {
+      throw new BadRequestException('Onlayn to‘lov hozircha ulanmagan. Kuryerga naqd to‘lashingiz mumkin.');
+    }
     const returnUrl = dto.returnUrl ?? `${process.env.WEB_ORIGIN?.split(',')[0]}/orders/${order.id}`;
 
     if (order.paymentMethod === 'PAYME') {
@@ -40,5 +59,5 @@ class PaymentsController {
   }
 }
 
-@Module({ controllers: [PaymentsController, PaymeController, ClickController] })
+@Module({ controllers: [PaymentMethodsController, PaymentsController, PaymeController, ClickController] })
 export class PaymentsModule {}

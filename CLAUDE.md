@@ -18,7 +18,7 @@ pnpm dev:web                                  # http://localhost:3000
 pnpm build                                    # builds both apps (this is also the type check; there is no linter)
 ```
 
-Tests: the only test is an end-to-end smoke script, `apps/api/test/smoke.ts`, a plain `node:assert` script with no test framework. It runs against a **running** API with `AUTH_DEV_MODE=true` and no bot token. It covers customer login, cart, order, FEFO stock deduction, admin status changes, courier delivery and Payme JSON-RPC:
+Tests: the only test is an end-to-end smoke script, `apps/api/test/smoke.ts`, a plain `node:assert` script with no test framework. It runs against a **running** API with `AUTH_DEV_MODE=true`, no bot token, and both `PAYME_KEY` and `PAYME_MERCHANT_ID` set in the API's env (the API rejects orders for payment methods whose keys are missing; `GET /v1/payments/methods` lists the enabled ones). It covers customer login, cart, order, FEFO stock deduction, admin status changes, courier delivery and Payme JSON-RPC:
 
 ```bash
 PAYME_KEY=<value from apps/api/.env> pnpm --filter api test:e2e   # API_URL overrides the target
