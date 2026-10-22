@@ -1,6 +1,8 @@
 'use client';
+import { RefreshCw, ShoppingBag } from 'lucide-react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthed } from '@/components/useAuthed';
 import { api } from '@/lib/client';
 import { price } from '@/lib/format';
@@ -15,31 +17,46 @@ interface Zone {
   daysMax: number;
 }
 
+interface Cart {
+  items: { variantId: number; qty: number; price: number; packSize: string; title: string }[];
+  itemsTotal: number;
+}
+
 export default function CheckoutPage() {
   const { locale } = useParams<{ locale: Locale }>();
   const t = dict(locale);
   const router = useRouter();
   const session = useAuthed();
   const [zones, setZones] = useState<Zone[]>([]);
-  const [itemsTotal, setItemsTotal] = useState(0);
+  const [cart, setCart] = useState<Cart>();
+  const [loadError, setLoadError] = useState(false);
   const [form, setForm] = useState({ zoneId: 0, street: '', landmark: '', paymentMethod: 'CASH', comment: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // Savat va hududlar birga yuklanadi. Xato bo'lsa (server uyg'onyapti) jim qolmaydi: qayta urinish tugmasi chiqadi.
+  const load = useCallback(() => {
+    setLoadError(false);
+    Promise.all([api<Zone[]>('/delivery-zones', { locale }), api<Cart>('/cart', { locale })])
+      .then(([z, c]) => {
+        setZones(z);
+        setForm((f) => ({ ...f, zoneId: f.zoneId || z[0]?.id || 0 }));
+        setCart(c);
+      })
+      .catch(() => setLoadError(true));
+  }, [locale]);
+
   useEffect(() => {
-    if (!session) return;
-    api<Zone[]>('/delivery-zones', { locale }).then((z) => {
-      setZones(z);
-      setForm((f) => ({ ...f, zoneId: f.zoneId || z[0]?.id || 0 }));
-    });
-    api<{ itemsTotal: number }>('/cart').then((c) => setItemsTotal(c.itemsTotal));
-  }, [session, locale]);
+    if (session) load();
+  }, [session, load]);
 
   const zone = useMemo(() => zones.find((z) => z.id === form.zoneId), [zones, form.zoneId]);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm({ ...form, [k]: k === 'zoneId' ? Number(e.target.value) : e.target.value });
 
   const submit = async () => {
+    // Tugma o'chirilmaydi: nima yetishmayotgani matn bilan aytiladi.
+    if (!form.street.trim()) return setError(t.enterAddress);
     setBusy(true);
     setError('');
     try {
@@ -65,6 +82,30 @@ export default function CheckoutPage() {
   };
 
   if (!session) return null;
+  if (loadError) {
+    return (
+      <div className="mx-auto flex max-w-md flex-col items-center gap-4 rounded-3xl bg-surface p-10 text-center">
+        <p className="text-slate-600">{t.loadError}</p>
+        <button className="btn-soft" onClick={load}>
+          <RefreshCw className="h-4 w-4" /> {t.retry}
+        </button>
+      </div>
+    );
+  }
+  if (!cart) return null;
+  // Buyurtma berilgandan keyin "orqaga" bosilsa yoki boshqa tabda savat bo'shatilsa.
+  if (!cart.items.length) {
+    return (
+      <div className="mx-auto flex max-w-md flex-col items-center gap-4 rounded-3xl bg-surface p-12 text-center">
+        <ShoppingBag className="h-12 w-12 text-brand-600" />
+        <p className="text-slate-600">{t.cartEmpty}</p>
+        <Link href={`/${locale}/catalog`} className="btn">
+          {t.catalog}
+        </Link>
+      </div>
+    );
+  }
+  const itemsTotal = cart.itemsTotal;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -82,7 +123,7 @@ export default function CheckoutPage() {
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t.street}
-          <input className="input" value={form.street} onChange={set('street')} />
+          <input className="input" value={form.street} onChange={(e) => (setError(''), set('street')(e))} />
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t.landmark}
@@ -107,6 +148,16 @@ export default function CheckoutPage() {
         </label>
       </section>
       <aside className="card h-fit p-5 text-sm">
+        <ul className="mb-3 flex flex-col gap-1.5 border-b border-slate-100 pb-3 text-slate-600">
+          {cart.items.map((i) => (
+            <li key={i.variantId} className="flex gap-2">
+              <span className="min-w-0 flex-1 truncate">
+                {i.title} {i.packSize} × {i.qty}
+              </span>
+              <span className="whitespace-nowrap">{price(i.price * i.qty, t.sum)}</span>
+            </li>
+          ))}
+        </ul>
         <div className="flex justify-between py-1">
           <span>{t.itemsTotal}</span>
           <span>{price(itemsTotal, t.sum)}</span>
@@ -120,7 +171,7 @@ export default function CheckoutPage() {
           <span>{price(itemsTotal + (zone?.fee ?? 0), t.sum)}</span>
         </div>
         {error && <p className="mt-3 text-red-600">{error}</p>}
-        <button className="btn mt-4 w-full" disabled={busy || !form.street.trim() || !itemsTotal} onClick={submit}>
+        <button className="btn mt-4 w-full" disabled={busy} onClick={submit}>
           {t.placeOrder}
         </button>
       </aside>
