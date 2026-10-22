@@ -9,10 +9,11 @@ import type { Locale } from '@/lib/i18n';
 // Kuryer: qayerga, kimga, qaysi manzilga olib borish kerak + qabul qiluvchining telefoni.
 interface Delivery {
   id: number;
-  status: 'ASSIGNED' | 'PICKED_UP' | 'IN_TRANSIT' | 'DELIVERED';
+  status: 'ASSIGNED' | 'PICKED_UP' | 'IN_TRANSIT' | 'DELIVERED' | 'RETURNED';
   codAmount: number;
   cashTaken: number | null;
   deliveredAt: string | null;
+  events?: { createdAt: string }[];
   order: {
     id: number;
     code: string;
@@ -24,7 +25,7 @@ interface Delivery {
   };
 }
 
-type Tab = 'active' | 'delivered';
+type Tab = 'active' | 'delivered' | 'returned';
 
 // Bitta mahsulot bir necha partiyadan yechilgan bo'lsa, kuryerga bitta qator (SKU bo'yicha jamlangan).
 const groupItems = (items: Delivery['order']['items']) => [
@@ -43,7 +44,8 @@ const L = {
     ASSIGNED: 'Omborda olish kerak', PICKED_UP: 'Qo‘lingizda', IN_TRANSIT: 'Yo‘lda',
     pickup: 'Omborda oldim', go: 'Yo‘lga chiqdim', done: 'Topshirdim', ret: 'Qaytardim', confirmDone: 'Buyurtma topshirildi va pul olindimi?', confirmRet: 'Buyurtma qaytarilsinmi?',
     shiftOn: 'Ishdaman', shiftOff: 'Ishda emasman', pcs: 'dona', refresh: 'Yangilash',
-    active: 'Jarayonda', delivered: 'Yetkazilgan', noneDelivered: 'Hali yetkazilgan buyurtma yo‘q', DELIVERED: 'Topshirildi', cashTaken: 'Olingan naqd',
+    active: 'Jarayonda', delivered: 'Yetkazilgan', returned: 'Bekor qilingan', noneDelivered: 'Hali yetkazilgan buyurtma yo‘q', noneReturned: 'Bekor qilingan buyurtma yo‘q',
+    DELIVERED: 'Topshirildi', RETURNED: 'Qaytarildi', cashTaken: 'Olingan naqd',
   },
   ru: {
     title: 'Мои доставки', none: 'Пока нет назначенных заказов', recipient: 'Получатель', address: 'Адрес', landmark: 'Ориентир',
@@ -51,11 +53,12 @@ const L = {
     ASSIGNED: 'Забрать со склада', PICKED_UP: 'У вас', IN_TRANSIT: 'В пути',
     pickup: 'Забрал со склада', go: 'Выехал', done: 'Доставил', ret: 'Возврат', confirmDone: 'Заказ передан и деньги получены?', confirmRet: 'Оформить возврат заказа?',
     shiftOn: 'На смене', shiftOff: 'Не на смене', pcs: 'шт.', refresh: 'Обновить',
-    active: 'В процессе', delivered: 'Доставленные', noneDelivered: 'Доставленных заказов пока нет', DELIVERED: 'Доставлен', cashTaken: 'Получено наличными',
+    active: 'В процессе', delivered: 'Доставленные', returned: 'Отменённые', noneDelivered: 'Доставленных заказов пока нет', noneReturned: 'Отменённых заказов нет',
+    DELIVERED: 'Доставлен', RETURNED: 'Возвращён', cashTaken: 'Получено наличными',
   },
 };
 
-const BADGE = { ASSIGNED: 'bg-amber-100 text-amber-800', PICKED_UP: 'bg-sky-100 text-sky-800', IN_TRANSIT: 'bg-brand-100 text-brand-800', DELIVERED: 'bg-slate-100 text-slate-600' };
+const BADGE = { ASSIGNED: 'bg-amber-100 text-amber-800', PICKED_UP: 'bg-sky-100 text-sky-800', IN_TRANSIT: 'bg-brand-100 text-brand-800', DELIVERED: 'bg-slate-100 text-slate-600', RETURNED: 'bg-red-50 text-red-700' };
 
 export default function CourierPage() {
   const { locale } = useParams<{ locale: Locale }>();
@@ -153,8 +156,8 @@ export default function CourierPage() {
           ))}
         </div>
       </div>
-      <div className="grid grid-cols-2 rounded-xl bg-white p-1 text-sm font-semibold shadow-sm">
-        {(['active', 'delivered'] as const).map((k) => (
+      <div className="grid grid-cols-3 rounded-xl bg-white p-1 text-sm font-semibold shadow-sm">
+        {(['active', 'delivered', 'returned'] as const).map((k) => (
           <button
             key={k}
             onClick={() => k !== tab && (setList(undefined), setTab(k))}
@@ -168,17 +171,20 @@ export default function CourierPage() {
       {list.length === 0 && (
         <div className="flex flex-col items-center gap-2 rounded-2xl bg-white p-10 text-center text-slate-500">
           <CheckCircle2 className="h-10 w-10 text-brand-500" />
-          {tab === 'active' ? t.none : t.noneDelivered}
+          {tab === 'active' ? t.none : tab === 'delivered' ? t.noneDelivered : t.noneReturned}
           <div className="mt-2">{refresh}</div>
         </div>
       )}
 
-      {tab === 'delivered' &&
+      {tab !== 'active' &&
         list.map((d) => (
           <article key={d.id} className="flex flex-col gap-2 rounded-2xl bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-mono font-bold tracking-wider">{d.order.code}</span>
-              <span className="text-sm text-slate-500">{d.deliveredAt && date(d.deliveredAt)}</span>
+            <div className="flex items-center gap-2">
+              <span className="flex-1 font-mono font-bold tracking-wider">{d.order.code}</span>
+              <span className="text-sm text-slate-500">
+                {d.status === 'DELIVERED' ? d.deliveredAt && date(d.deliveredAt) : d.events?.[0] && date(d.events[0].createdAt)}
+              </span>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${BADGE[d.status]}`}>{t[d.status]}</span>
             </div>
             <p className="text-sm">
               <b>{d.order.user.name ?? '—'}</b> · {d.order.user.phone}

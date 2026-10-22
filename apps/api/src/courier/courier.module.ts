@@ -13,7 +13,7 @@ class DeliveryStatusDto {
 }
 
 class DeliveriesQuery {
-  @IsOptional() @IsIn(['active', 'delivered']) tab?: 'active' | 'delivered';
+  @IsOptional() @IsIn(['active', 'delivered', 'returned']) tab?: 'active' | 'delivered' | 'returned';
 }
 
 class CourierStatusDto {
@@ -37,14 +37,20 @@ class CourierController {
     private readonly orders: OrdersService,
   ) {}
 
-  // tab=active: jarayondagilar (eng eskisi birinchi); tab=delivered: topshirilganlar (oxirgi 100 ta, yangisi birinchi).
+  // tab=active: jarayondagilar (eng eskisi birinchi); delivered / returned: topshirilgan / qaytarilganlar (oxirgi 100 ta, yangisi birinchi).
   @Get('deliveries')
   async list(@CurrentUser() user: AuthUser, @Query() q: DeliveriesQuery) {
     const courier = await this.me(user);
-    const delivered = q.tab === 'delivered';
+    const tab = q.tab ?? 'active';
+    const history = tab !== 'active';
     return this.prisma.delivery.findMany({
-      where: { courierId: courier.id, status: delivered ? 'DELIVERED' : { in: ['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'] } },
+      where: {
+        courierId: courier.id,
+        status: tab === 'delivered' ? 'DELIVERED' : tab === 'returned' ? 'RETURNED' : { in: ['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'] },
+      },
       include: {
+        // Qaytarilgan vaqt: RETURNED hodisasidan.
+        events: { where: { status: 'RETURNED' }, select: { createdAt: true } },
         order: {
           select: {
             id: true,
@@ -61,8 +67,8 @@ class CourierController {
           },
         },
       },
-      orderBy: delivered ? { deliveredAt: 'desc' } : { createdAt: 'asc' },
-      take: delivered ? 100 : undefined,
+      orderBy: tab === 'delivered' ? { deliveredAt: 'desc' } : history ? { id: 'desc' } : { createdAt: 'asc' },
+      take: history ? 100 : undefined,
     });
   }
 
