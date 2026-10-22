@@ -118,6 +118,11 @@ const uz = {
   courierSeesPhone: 'Buyurtmangizni yetkazayotgan kuryer siz bilan shu raqam orqali bog‘lanadi.',
   save: 'Saqlash',
   saved: 'Saqlandi',
+  recentOrders: 'So‘nggi buyurtmalar',
+  allOrders: 'Barchasi',
+  myAddresses: 'Manzillarim',
+  loadError: 'Ma’lumotni yuklab bo‘lmadi. Birozdan keyin qayta urinib ko‘ring.',
+  retry: 'Qayta urinish',
   heroSlides: [
     { title: 'Hayvonlaringiz salomatligi uchun', text: 'Vitaminlar, parazitlarga qarshi vositalar va parvarish mahsulotlari bir joyda.', cta: 'Katalogga o‘tish', href: '/catalog' },
     { title: 'Trenddagi tovarlar', text: 'Fermerlar va uy hayvonlari egalari eng ko‘p tanlayotgan mahsulotlar.', cta: 'Ko‘rish', href: '/catalog?tag=trending' },
@@ -242,6 +247,11 @@ const ru: typeof uz = {
   courierSeesPhone: 'Курьер, доставляющий ваш заказ, свяжется с вами по этому номеру.',
   save: 'Сохранить',
   saved: 'Сохранено',
+  recentOrders: 'Последние заказы',
+  allOrders: 'Все заказы',
+  myAddresses: 'Мои адреса',
+  loadError: 'Не удалось загрузить данные. Попробуйте ещё раз чуть позже.',
+  retry: 'Повторить',
   heroSlides: [
     { title: 'Для здоровья ваших животных', text: 'Витамины, противопаразитарные средства и товары для ухода в одном месте.', cta: 'Перейти в каталог', href: '/catalog' },
     { title: 'Популярные товары', text: 'То, что чаще всего выбирают фермеры и владельцы питомцев.', cta: 'Смотреть', href: '/catalog?tag=trending' },
