@@ -20,6 +20,8 @@ import { PrismaService } from '../prisma/prisma.service';
 
 class OrdersQuery {
   @IsOptional() @IsEnum(OrderStatus) status?: OrderStatus;
+  // Buyurtma kodi bo'yicha qidiruv (holatdan qat'i nazar).
+  @IsOptional() @IsString() @MaxLength(20) code?: string;
 }
 
 class StatusDto {
@@ -62,11 +64,15 @@ class StaffController {
   @Get('orders')
   list(@Query() q: OrdersQuery) {
     return this.prisma.order.findMany({
-      where: q.status ? { status: q.status } : {},
+      where: q.code?.trim()
+        ? { code: { contains: q.code.trim().toUpperCase() } }
+        : q.status
+          ? { status: q.status }
+          : {},
       include: {
         user: { select: { phone: true, name: true, telegramUsername: true } },
         address: { include: { zone: true } },
-        items: { include: { batch: { select: { batchNo: true, expiryDate: true } } } },
+        items: { include: { batch: { select: { batchNo: true, expiryDate: true } }, variant: { select: { sku: true } } } },
         payments: { select: { provider: true, state: true, amount: true } },
         delivery: { include: { courier: { include: { user: { select: { phone: true, name: true } } } } } },
       },

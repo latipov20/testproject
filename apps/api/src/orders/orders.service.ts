@@ -1,8 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { OrderStatus, PaymentMethod, Prisma } from '@prisma/client';
+import { randomInt } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
 type Tx = Prisma.TransactionClient;
+
+// 0/O va 1/I kabi chalkashadigan belgilarsiz: telefonda aytish va qo'lda yozish oson.
+const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+const orderCode = () => Array.from({ length: 8 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join('');
 
 @Injectable()
 export class OrdersService {
@@ -11,6 +16,18 @@ export class OrdersService {
   // Savatdan buyurtma yaratadi. Qoldiq FEFO tartibida yechiladi:
   // avval yaroqlilik muddati eng yaqin partiyadan.
   async createFromCart(userId: number, addressId: number, paymentMethod: PaymentMethod, comment?: string) {
+    // Kod takrorlansa (ehtimoli juda kichik) tranzaksiya yangi kod bilan qaytariladi.
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.createOnce(userId, addressId, paymentMethod, orderCode(), comment);
+      } catch (e) {
+        const codeTaken = e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002' && String(e.meta?.target).includes('code');
+        if (!codeTaken || attempt === 5) throw e;
+      }
+    }
+  }
+
+  private async createOnce(userId: number, addressId: number, paymentMethod: PaymentMethod, code: string, comment?: string) {
     return this.prisma.$transaction(async (tx) => {
       const address = await tx.address.findFirst({ where: { id: addressId, userId }, include: { zone: true } });
       if (!address) throw new NotFoundException('Manzil topilmadi');
@@ -40,6 +57,7 @@ export class OrdersService {
       const deliveryFee = address.zone.fee;
       const order = await tx.order.create({
         data: {
+          code,
           userId,
           addressId,
           itemsTotal,
@@ -50,6 +68,7 @@ export class OrdersService {
           items: { create: lines },
         },
         include: { items: true },
+        omit: { code: true },
       });
 
       await tx.stockMovement.createMany({
@@ -77,7 +96,7 @@ export class OrdersService {
       await tx.stockMovement.createMany({
         data: order.items.map((i) => ({ batchId: i.batchId, type: 'RETURN' as const, qty: i.qty, orderId, userId: actorId })),
       });
-      return tx.order.update({ where: { id: orderId }, data: { status: 'CANCELLED' } });
+      return tx.order.update({ where: { id: orderId }, data: { status: 'CANCELLED' }, omit: { code: true } });
     });
   }
 

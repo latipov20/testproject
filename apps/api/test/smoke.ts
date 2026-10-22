@@ -46,6 +46,7 @@ async function main() {
   // Buyurtma: 12 dona -> B1 partiyadan (10, muddati yaqin) va B2 dan (2). FEFO.
   const order = await call('POST', '/orders', { addressId: address.id, paymentMethod: 'CASH' }, customer);
   assert.equal(order.total, variant.price * 12 + 20000);
+  assert.equal(order.code, undefined, 'buyurtma kodi xaridorga ko‘rinmasligi kerak');
   const batches = await call('GET', `/staff/batches?variantId=${variant.id}`, undefined, admin);
   const used = order.items.map((i: any) => [batches.find((b: any) => b.id === i.batchId).batchNo, i.qty]);
   console.log('FEFO taqsimot:', used);
@@ -62,11 +63,18 @@ async function main() {
 
   // Kuryer: olish va topshirish (naqd)
   const mine = await call('GET', '/courier/deliveries', undefined, courier);
-  assert.ok(mine.some((d: any) => d.id === delivery.id));
+  const assigned = mine.find((d: any) => d.id === delivery.id);
+  assert.match(assigned.order.code, /^[2-9A-HJ-NP-Z]{8}$/);
+  assert.ok(assigned.order.items.every((i: any) => i.variant.sku));
   await call('POST', `/courier/deliveries/${delivery.id}/status`, { status: 'PICKED_UP' }, courier);
   await call('POST', `/courier/deliveries/${delivery.id}/status`, { status: 'DELIVERED', cashTaken: order.total }, courier);
+  const delivered = await call('GET', '/courier/deliveries?tab=delivered', undefined, courier);
+  assert.ok(delivered.some((d: any) => d.id === delivery.id), 'topshirilgan buyurtma "Yetkazilgan" bo‘limida');
   const done = await call('GET', `/orders/${order.id}`, undefined, customer);
   assert.equal(done.status, 'DELIVERED');
+  assert.equal(done.code, undefined);
+  const found = await call('GET', `/staff/orders?code=${assigned.order.code.toLowerCase()}`, undefined, admin);
+  assert.deepEqual(found.map((o: any) => o.id), [order.id]);
   assert.equal(done.payments[0].state, 'PAID');
 
   // Bekor qilish omborga qaytaradi

@@ -31,6 +31,7 @@ class OrdersController {
     return this.prisma.order.findMany({
       where: { userId: user.id },
       include: { items: true, delivery: { select: { status: true } } },
+      omit: { code: true },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -40,6 +41,7 @@ class OrdersController {
     const order = await this.prisma.order.findFirst({
       where: { id, userId: user.id },
       include: { items: true, address: { include: { zone: true } }, payments: true, delivery: { include: { events: true } } },
+      omit: { code: true },
     });
     if (!order) throw new NotFoundException();
     return order;

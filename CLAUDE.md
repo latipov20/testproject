@@ -42,6 +42,7 @@ After you change `schema.prisma`, run `pnpm --filter api exec prisma migrate dev
 - **Bilingual content** is stored as paired columns (`titleUz`/`titleRu`, `nameUz`/`nameRu`, …). Controllers read `Accept-Language` through `langFrom()` and pick the field with `pick(obj, 'title', lang)` (`src/common/i18n.ts`), which falls back to the other language.
 - **Inventory is batch-based** (`Batch` with series and expiry, plus a `StockMovement` log). Order creation deducts stock **FEFO** (earliest expiry first) and skips expired batches, inside a `prisma.$transaction` (`orders/orders.service.ts`). A cancel or a courier return puts the stock back.
 - Order status flow: `NEW → CONFIRMED → PACKED` (admin) `→ SHIPPED` (courier picks up) `→ DELIVERED`.
+- Each order has a unique 8-character `Order.code` (generated in `OrdersService`, alphabet without 0/O/1/I). Admins and couriers identify orders by this code, and products by variant SKU. **Customers must never see order IDs or codes**: customer-facing order queries use `omit: { code: true }`, and the shop UI identifies an order by its date.
 - Prices are integer so'm. Only non-prescription products are sold.
 - Telegram ids are `BigInt`. `main.ts` patches `BigInt.prototype.toJSON` so they serialize as strings.
 - Uploaded images go to `apps/api/uploads` (gitignored) and are served at `/uploads/`. Render's disk is ephemeral.

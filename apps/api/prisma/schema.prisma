@@ -263,6 +263,8 @@ model Favorite {
 
 model Order {
   id            Int           @id @default(autoincrement())
+  // Admin va kuryer ko'radigan noyob kod (masalan K7M2Q9XA). Xaridorga qaytarilmaydi.
+  code          String        @unique
   userId        Int
   addressId     Int
   itemsTotal    Int

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Module, NotFoundException, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Module, NotFoundException, Param, ParseIntPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { DeliveryStatus } from '@prisma/client';
 import { IsIn, IsInt, IsNumber, IsOptional, Min } from 'class-validator';
 import { AuthGuard, AuthUser, CurrentUser, Roles } from '../common/auth';
@@ -10,6 +10,10 @@ class DeliveryStatusDto {
   @IsOptional() @IsNumber() lat?: number;
   @IsOptional() @IsNumber() lng?: number;
   @IsOptional() @IsInt() @Min(0) cashTaken?: number;
+}
+
+class DeliveriesQuery {
+  @IsOptional() @IsIn(['active', 'delivered']) tab?: 'active' | 'delivered';
 }
 
 class CourierStatusDto {
@@ -33,15 +37,18 @@ class CourierController {
     private readonly orders: OrdersService,
   ) {}
 
+  // tab=active: jarayondagilar (eng eskisi birinchi); tab=delivered: topshirilganlar (oxirgi 100 ta, yangisi birinchi).
   @Get('deliveries')
-  async list(@CurrentUser() user: AuthUser) {
+  async list(@CurrentUser() user: AuthUser, @Query() q: DeliveriesQuery) {
     const courier = await this.me(user);
+    const delivered = q.tab === 'delivered';
     return this.prisma.delivery.findMany({
-      where: { courierId: courier.id, status: { in: ['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'] } },
+      where: { courierId: courier.id, status: delivered ? 'DELIVERED' : { in: ['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'] } },
       include: {
         order: {
           select: {
             id: true,
+            code: true,
             total: true,
             paymentMethod: true,
             comment: true,
@@ -49,12 +56,13 @@ class CourierController {
             // Qabul qiluvchi: Telegram orqali tasdiqlangan raqam va ism.
             user: { select: { phone: true, name: true, telegramUsername: true } },
             address: { include: { zone: true } },
-            items: { select: { title: true, qty: true } },
+            items: { select: { title: true, qty: true, variant: { select: { sku: true } } } },
             payments: { where: { state: 'PAID' }, select: { provider: true } },
           },
         },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: delivered ? { deliveredAt: 'desc' } : { createdAt: 'asc' },
+      take: delivered ? 100 : undefined,
     });
   }
 
