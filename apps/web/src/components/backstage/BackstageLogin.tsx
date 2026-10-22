@@ -9,6 +9,11 @@ import type { Area } from './useBackstage';
 
 const TITLE: Record<Area, string> = { admin: 'Admin paneli', courier: 'Kuryer ilovasi' };
 const ROLE: Record<Area, string> = { admin: 'ADMIN', courier: 'COURIER' };
+// Login to'g'ri, lekin akkaunt boshqa bo'limniki: qayerga kirish kerakligini aytamiz.
+const MISMATCH: Record<Area, string> = {
+  admin: 'Bu kuryer akkaunti. Admin panelga admin login/paroli bilan kiring (kuryerlar kuryer ilovasiga kiradi).',
+  courier: 'Bu admin akkaunti. Kuryer ilovasiga admin panelda yaratilgan kuryer login/paroli bilan kiring.',
+};
 
 export function BackstageLogin({ area }: { area: Area }) {
   const { locale } = useParams<{ locale: Locale }>();
@@ -26,7 +31,7 @@ export function BackstageLogin({ area }: { area: Area }) {
           onDone={(user) => {
             if (user.role !== ROLE[area]) {
               setSession(null);
-              setError('Bu akkauntda bu bo‘limga ruxsat yo‘q. Administrator bilan bog‘laning.');
+              setError(MISMATCH[area]);
               return;
             }
             router.replace(`/${locale}/${area}`);
