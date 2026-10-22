@@ -99,6 +99,10 @@ export default function AdminOrdersPage() {
           <div className="flex flex-wrap items-center gap-3">
             <b className="rounded bg-slate-100 px-2 py-0.5 font-mono tracking-wider">{o.code}</b>
             <StatusBadge status={o.status} label={LABEL[o.status]} />
+            {/* Kuryer "Qaytardim" bosgan buyurtma: bekor qilinganlar ichida alohida ajralib turadi. */}
+            {o.status === 'CANCELLED' && o.delivery?.status === 'RETURNED' && (
+              <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">Kuryer tomonidan bekor qilingan</span>
+            )}
             <span className="text-slate-500">{date(o.createdAt)}</span>
             <span className="ml-auto font-semibold">{price(o.total, 'so‘m')}</span>
           </div>
