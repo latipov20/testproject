@@ -50,10 +50,9 @@ export default function OrderPage() {
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-bold">
-          {t.orderNo} #{order.id}
+          {t.orderNo} · {date(order.createdAt, locale)}
         </h1>
         <StatusBadge status={order.status} label={t.status[order.status]} />
-        <span className="text-sm text-slate-500">{date(order.createdAt, locale)}</span>
       </div>
       <section className="card divide-y divide-slate-100">
         {order.items.map((i) => (

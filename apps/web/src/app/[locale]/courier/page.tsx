@@ -1,25 +1,40 @@
 'use client';
 import { Banknote, CheckCircle2, Loader2, MapPin, MessageSquare, Navigation, Package, Phone, RefreshCw, Send, User } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/client';
-import { price } from '@/lib/format';
+import { date, price } from '@/lib/format';
 import type { Locale } from '@/lib/i18n';
 
 // Kuryer: qayerga, kimga, qaysi manzilga olib borish kerak + qabul qiluvchining telefoni.
 interface Delivery {
   id: number;
-  status: 'ASSIGNED' | 'PICKED_UP' | 'IN_TRANSIT';
+  status: 'ASSIGNED' | 'PICKED_UP' | 'IN_TRANSIT' | 'DELIVERED';
   codAmount: number;
+  cashTaken: number | null;
+  deliveredAt: string | null;
   order: {
     id: number;
+    code: string;
     total: number;
     comment: string | null;
     user: { phone: string; name: string | null; telegramUsername: string | null };
     address: { street: string; landmark: string | null; lat: number | null; lng: number | null; zone: { regionUz: string; regionRu: string } };
-    items: { title: string; qty: number }[];
+    items: { title: string; qty: number; variant: { sku: string } }[];
   };
 }
+
+type Tab = 'active' | 'delivered';
+
+// Bitta mahsulot bir necha partiyadan yechilgan bo'lsa, kuryerga bitta qator (SKU bo'yicha jamlangan).
+const groupItems = (items: Delivery['order']['items']) => [
+  ...items
+    .reduce((m, i) => {
+      const prev = m.get(i.variant.sku);
+      return m.set(i.variant.sku, { sku: i.variant.sku, title: i.title, qty: (prev?.qty ?? 0) + i.qty });
+    }, new Map<string, { sku: string; title: string; qty: number }>())
+    .values(),
+];
 
 const L = {
   uz: {
@@ -28,6 +43,7 @@ const L = {
     ASSIGNED: 'Omborda olish kerak', PICKED_UP: 'Qo‘lingizda', IN_TRANSIT: 'Yo‘lda',
     pickup: 'Omborda oldim', go: 'Yo‘lga chiqdim', done: 'Topshirdim', ret: 'Qaytardim', confirmDone: 'Buyurtma topshirildi va pul olindimi?', confirmRet: 'Buyurtma qaytarilsinmi?',
     shiftOn: 'Ishdaman', shiftOff: 'Ishda emasman', pcs: 'dona', refresh: 'Yangilash',
+    active: 'Jarayonda', delivered: 'Yetkazilgan', noneDelivered: 'Hali yetkazilgan buyurtma yo‘q', DELIVERED: 'Topshirildi', cashTaken: 'Olingan naqd',
   },
   ru: {
     title: 'Мои доставки', none: 'Пока нет назначенных заказов', recipient: 'Получатель', address: 'Адрес', landmark: 'Ориентир',
@@ -35,24 +51,33 @@ const L = {
     ASSIGNED: 'Забрать со склада', PICKED_UP: 'У вас', IN_TRANSIT: 'В пути',
     pickup: 'Забрал со склада', go: 'Выехал', done: 'Доставил', ret: 'Возврат', confirmDone: 'Заказ передан и деньги получены?', confirmRet: 'Оформить возврат заказа?',
     shiftOn: 'На смене', shiftOff: 'Не на смене', pcs: 'шт.', refresh: 'Обновить',
+    active: 'В процессе', delivered: 'Доставленные', noneDelivered: 'Доставленных заказов пока нет', DELIVERED: 'Доставлен', cashTaken: 'Получено наличными',
   },
 };
 
-const BADGE = { ASSIGNED: 'bg-amber-100 text-amber-800', PICKED_UP: 'bg-sky-100 text-sky-800', IN_TRANSIT: 'bg-brand-100 text-brand-800' };
+const BADGE = { ASSIGNED: 'bg-amber-100 text-amber-800', PICKED_UP: 'bg-sky-100 text-sky-800', IN_TRANSIT: 'bg-brand-100 text-brand-800', DELIVERED: 'bg-slate-100 text-slate-600' };
 
 export default function CourierPage() {
   const { locale } = useParams<{ locale: Locale }>();
   const t = L[locale] ?? L.uz;
+  const [tab, setTab] = useState<Tab>('active');
   const [list, setList] = useState<Delivery[]>();
   const [shift, setShift] = useState<'ACTIVE' | 'OFFLINE' | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // Bo'lim tez almashtirilsa, eski so'rovning kech kelgan javobi yangi ro'yxatni bosib ketmasin.
+  const seq = useRef(0);
 
   // Ro'yxat va smena holati birga yangilanadi; xato bo'lsa ko'rsatiladi va "Yangilash" bilan qayta uriniladi.
   const load = useCallback(async () => {
+    const n = ++seq.current;
     setBusy(true);
     try {
-      const [deliveries, me] = await Promise.all([api<Delivery[]>('/courier/deliveries'), api<{ status: 'ACTIVE' | 'BUSY' | 'OFFLINE' }>('/courier/me')]);
+      const [deliveries, me] = await Promise.all([
+        api<Delivery[]>(`/courier/deliveries?tab=${tab}`),
+        api<{ status: 'ACTIVE' | 'BUSY' | 'OFFLINE' }>('/courier/me'),
+      ]);
+      if (n !== seq.current) return;
       setList(deliveries);
       setShift(me.status === 'OFFLINE' ? 'OFFLINE' : 'ACTIVE');
       setError('');
@@ -61,7 +86,7 @@ export default function CourierPage() {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [tab]);
   useEffect(() => {
     load();
     const id = setInterval(load, 60_000);
@@ -128,23 +153,68 @@ export default function CourierPage() {
           ))}
         </div>
       </div>
+      <div className="grid grid-cols-2 rounded-xl bg-white p-1 text-sm font-semibold shadow-sm">
+        {(['active', 'delivered'] as const).map((k) => (
+          <button
+            key={k}
+            onClick={() => k !== tab && (setList(undefined), setTab(k))}
+            className={`rounded-lg py-2 ${tab === k ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+          >
+            {t[k]}
+          </button>
+        ))}
+      </div>
       {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {list.length === 0 && (
         <div className="flex flex-col items-center gap-2 rounded-2xl bg-white p-10 text-center text-slate-500">
           <CheckCircle2 className="h-10 w-10 text-brand-500" />
-          {t.none}
+          {tab === 'active' ? t.none : t.noneDelivered}
           <div className="mt-2">{refresh}</div>
         </div>
       )}
 
-      {list.map((d) => {
+      {tab === 'delivered' &&
+        list.map((d) => (
+          <article key={d.id} className="flex flex-col gap-2 rounded-2xl bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono font-bold tracking-wider">{d.order.code}</span>
+              <span className="text-sm text-slate-500">{d.deliveredAt && date(d.deliveredAt)}</span>
+            </div>
+            <p className="text-sm">
+              <b>{d.order.user.name ?? '—'}</b> · {d.order.user.phone}
+            </p>
+            <p className="text-sm text-slate-600">
+              {locale === 'ru' ? d.order.address.zone.regionRu : d.order.address.zone.regionUz}, {d.order.address.street}
+            </p>
+            <ul className="flex flex-col gap-0.5 border-t border-slate-100 pt-2 text-sm">
+              {groupItems(d.order.items).map((i) => (
+                <li key={i.sku} className="flex justify-between gap-3">
+                  <span>
+                    <span className="mr-1.5 font-mono text-xs text-slate-500">{i.sku}</span>
+                    {i.title}
+                  </span>
+                  <span className="whitespace-nowrap font-semibold">
+                    {i.qty} {t.pcs}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {!!d.cashTaken && (
+              <p className="text-sm text-slate-600">
+                {t.cashTaken}: <b>{price(d.cashTaken, 'so‘m')}</b>
+              </p>
+            )}
+          </article>
+        ))}
+
+      {tab === 'active' && list.map((d) => {
         const a = d.order.address;
         const region = locale === 'ru' ? a.zone.regionRu : a.zone.regionUz;
         const mapUrl = a.lat && a.lng ? `https://yandex.uz/maps/?pt=${a.lng},${a.lat}&z=17` : `https://yandex.uz/maps/?text=${encodeURIComponent(`${region}, ${a.street}`)}`;
         return (
           <article key={d.id} className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
-              <span className="font-bold">#{d.order.id}</span>
+              <span className="font-mono font-bold tracking-wider">{d.order.code}</span>
               <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${BADGE[d.status]}`}>{t[d.status]}</span>
             </div>
 
@@ -193,9 +263,12 @@ export default function CourierPage() {
                   <Package className="h-3.5 w-3.5" /> {t.items}
                 </p>
                 <ul className="flex flex-col gap-0.5 text-sm">
-                  {d.order.items.map((i, n) => (
-                    <li key={n} className="flex justify-between gap-3">
-                      <span>{i.title}</span>
+                  {groupItems(d.order.items).map((i) => (
+                    <li key={i.sku} className="flex justify-between gap-3">
+                      <span>
+                        <span className="mr-1.5 font-mono text-xs text-slate-500">{i.sku}</span>
+                        {i.title}
+                      </span>
                       <span className="whitespace-nowrap font-semibold">
                         {i.qty} {t.pcs}
                       </span>

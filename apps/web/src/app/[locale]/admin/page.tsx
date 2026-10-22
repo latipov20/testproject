@@ -8,6 +8,7 @@ import { dict } from '@/lib/i18n';
 // Buyurtmalar: tasdiqlash, yig'ish, kuryerga biriktirish, bekor qilish.
 interface Order {
   id: number;
+  code: string;
   status: string;
   total: number;
   paymentMethod: string;
@@ -15,7 +16,7 @@ interface Order {
   comment: string | null;
   user: { phone: string; name: string | null; telegramUsername: string | null };
   address: { street: string; landmark: string | null; zone: { regionUz: string } };
-  items: { id: number; title: string; qty: number; price: number; batch: { batchNo: string; expiryDate: string } }[];
+  items: { id: number; title: string; qty: number; price: number; batch: { batchNo: string; expiryDate: string }; variant: { sku: string } }[];
   payments: { state: string }[];
   delivery: { status: string; courier: { user: { name: string | null; phone: string } } } | null;
 }
@@ -34,23 +35,28 @@ const DELIVERY: Record<string, string> = { ASSIGNED: 'biriktirilgan', PICKED_UP:
 
 export default function AdminOrdersPage() {
   const [status, setStatus] = useState('NEW');
+  const [code, setCode] = useState('');
   const [orders, setOrders] = useState<Order[]>([]);
   const [couriers, setCouriers] = useState<Courier[]>([]);
   const [msg, setMsg] = useState('');
 
   const load = useCallback(async () => {
     try {
-      const [o, c] = await Promise.all([api<Order[]>(`/staff/orders?status=${status}`), api<Courier[]>('/staff/couriers')]);
+      // Kod kiritilgan bo'lsa, holatdan qat'i nazar shu kod bo'yicha qidiriladi.
+      const query = code.trim() ? `code=${encodeURIComponent(code.trim())}` : `status=${status}`;
+      const [o, c] = await Promise.all([api<Order[]>(`/staff/orders?${query}`), api<Courier[]>('/staff/couriers')]);
       setOrders(o);
       setCouriers(c);
     } catch (e) {
       setMsg((e as Error).message);
     }
-  }, [status]);
+  }, [status, code]);
 
+  // Kod yozilayotganda har harfga so'rov ketmasin.
   useEffect(() => {
-    load();
-  }, [load]);
+    const id = setTimeout(load, code ? 300 : 0);
+    return () => clearTimeout(id);
+  }, [load, code]);
 
   const act = async (path: string, body?: unknown) => {
     setMsg('');
@@ -65,24 +71,33 @@ export default function AdminOrdersPage() {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-lg font-bold">Buyurtmalar</h1>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         {STATUSES.map((s) => (
           <button
             key={s}
-            onClick={() => setStatus(s)}
-            className={`rounded-md border px-3 py-1.5 ${status === s ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+            onClick={() => (setCode(''), setStatus(s))}
+            className={`rounded-md border px-3 py-1.5 ${status === s && !code.trim() ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
           >
             {LABEL[s]}
           </button>
         ))}
+        <input
+          className="input ml-auto w-44 py-1.5 font-mono uppercase"
+          placeholder="Kod bo‘yicha qidirish"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          maxLength={20}
+        />
       </div>
       {msg && <p className="rounded-md bg-red-50 p-3 text-red-700">{msg}</p>}
-      {orders.length === 0 && <p className="rounded-md bg-white p-6 text-center text-slate-500">Bu holatda buyurtma yo‘q</p>}
+      {orders.length === 0 && (
+        <p className="rounded-md bg-white p-6 text-center text-slate-500">{code.trim() ? 'Bu kod bilan buyurtma topilmadi' : 'Bu holatda buyurtma yo‘q'}</p>
+      )}
 
       {orders.map((o) => (
         <article key={o.id} className="flex flex-col gap-3 rounded-md border border-slate-200 bg-white p-4">
           <div className="flex flex-wrap items-center gap-3">
-            <b>#{o.id}</b>
+            <b className="rounded bg-slate-100 px-2 py-0.5 font-mono tracking-wider">{o.code}</b>
             <StatusBadge status={o.status} label={LABEL[o.status]} />
             <span className="text-slate-500">{date(o.createdAt)}</span>
             <span className="ml-auto font-semibold">{price(o.total, 'so‘m')}</span>
@@ -114,6 +129,7 @@ export default function AdminOrdersPage() {
               <thead className="text-xs text-slate-500">
                 <tr>
                   <th className="py-1 font-normal">Mahsulot</th>
+                  <th className="font-normal">SKU</th>
                   <th className="font-normal">Soni</th>
                   <th className="font-normal">Partiya</th>
                   <th className="font-normal">Muddati</th>
@@ -123,6 +139,7 @@ export default function AdminOrdersPage() {
                 {o.items.map((i) => (
                   <tr key={i.id} className="border-t border-slate-100">
                     <td className="py-1.5">{i.title}</td>
+                    <td className="font-mono text-xs">{i.variant.sku}</td>
                     <td>{i.qty}</td>
                     <td>{i.batch.batchNo}</td>
                     <td>{date(i.batch.expiryDate)}</td>

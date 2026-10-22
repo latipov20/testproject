@@ -185,8 +185,7 @@ export default function CabinetPage() {
                 {recent.map((o) => (
                   <li key={o.id}>
                     <Link href={`/${locale}/orders/${o.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-slate-100 p-3 hover:border-brand-500">
-                      <span className="font-semibold">#{o.id}</span>
-                      <span className="text-sm text-slate-500">{date(o.createdAt, locale)}</span>
+                      <span className="font-semibold">{date(o.createdAt, locale)}</span>
                       <StatusBadge status={o.status} label={t.status[o.status]} />
                       <span className="ml-auto font-semibold">{price(o.total, t.sum)}</span>
                       <span className="w-full truncate text-sm text-slate-500">{o.items.map((i) => `${i.title} × ${i.qty}`).join(', ')}</span>

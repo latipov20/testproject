@@ -34,9 +34,8 @@ export default function OrdersPage() {
       {orders.map((o) => (
         <Link key={o.id} href={`/${locale}/orders/${o.id}`} className="card flex flex-wrap items-center gap-3 p-4 hover:border-brand-500">
           <span className="font-semibold">
-            {t.orderNo} #{o.id}
+            {t.orderNo} · {date(o.createdAt, locale)}
           </span>
-          <span className="text-sm text-slate-500">{date(o.createdAt, locale)}</span>
           <StatusBadge status={o.status} label={t.status[o.status]} />
           <span className="ml-auto font-semibold">{price(o.total, t.sum)}</span>
           <span className="w-full truncate text-sm text-slate-500">{o.items.map((i) => `${i.title} × ${i.qty}`).join(', ')}</span>
