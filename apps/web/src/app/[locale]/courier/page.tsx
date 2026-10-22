@@ -20,7 +20,7 @@ interface Delivery {
     comment: string | null;
     user: { phone: string; name: string | null; telegramUsername: string | null };
     address: { street: string; landmark: string | null; lat: number | null; lng: number | null; zone: { regionUz: string; regionRu: string } };
-    items: { title: string; qty: number; variant: { sku: string } }[];
+    items: { title: string; qty: number; variant?: { sku: string } }[];
   };
 }
 
@@ -30,8 +30,8 @@ type Tab = 'active' | 'delivered';
 const groupItems = (items: Delivery['order']['items']) => [
   ...items
     .reduce((m, i) => {
-      const prev = m.get(i.variant.sku);
-      return m.set(i.variant.sku, { sku: i.variant.sku, title: i.title, qty: (prev?.qty ?? 0) + i.qty });
+      const key = i.variant?.sku ?? i.title;
+      return m.set(key, { sku: i.variant?.sku ?? '', title: i.title, qty: (m.get(key)?.qty ?? 0) + i.qty });
     }, new Map<string, { sku: string; title: string; qty: number }>())
     .values(),
 ];
@@ -188,7 +188,7 @@ export default function CourierPage() {
             </p>
             <ul className="flex flex-col gap-0.5 border-t border-slate-100 pt-2 text-sm">
               {groupItems(d.order.items).map((i) => (
-                <li key={i.sku} className="flex justify-between gap-3">
+                <li key={i.sku || i.title} className="flex justify-between gap-3">
                   <span>
                     <span className="mr-1.5 font-mono text-xs text-slate-500">{i.sku}</span>
                     {i.title}
@@ -264,7 +264,7 @@ export default function CourierPage() {
                 </p>
                 <ul className="flex flex-col gap-0.5 text-sm">
                   {groupItems(d.order.items).map((i) => (
-                    <li key={i.sku} className="flex justify-between gap-3">
+                    <li key={i.sku || i.title} className="flex justify-between gap-3">
                       <span>
                         <span className="mr-1.5 font-mono text-xs text-slate-500">{i.sku}</span>
                         {i.title}

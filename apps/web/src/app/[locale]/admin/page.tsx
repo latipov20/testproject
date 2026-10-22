@@ -16,7 +16,7 @@ interface Order {
   comment: string | null;
   user: { phone: string; name: string | null; telegramUsername: string | null };
   address: { street: string; landmark: string | null; zone: { regionUz: string } };
-  items: { id: number; title: string; qty: number; price: number; batch: { batchNo: string; expiryDate: string }; variant: { sku: string } }[];
+  items: { id: number; title: string; qty: number; price: number; batch: { batchNo: string; expiryDate: string }; variant?: { sku: string } }[];
   payments: { state: string }[];
   delivery: { status: string; courier: { user: { name: string | null; phone: string } } } | null;
 }
@@ -143,7 +143,7 @@ export default function AdminOrdersPage() {
                 {o.items.map((i) => (
                   <tr key={i.id} className="border-t border-slate-100">
                     <td className="py-1.5">{i.title}</td>
-                    <td className="font-mono text-xs">{i.variant.sku}</td>
+                    <td className="font-mono text-xs">{i.variant?.sku}</td>
                     <td>{i.qty}</td>
                     <td>{i.batch.batchNo}</td>
                     <td>{date(i.batch.expiryDate)}</td>
