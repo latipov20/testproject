@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { OrderStatus, PaymentMethod, Prisma } from '@prisma/client';
+import { CancelledBy, OrderStatus, PaymentMethod, Prisma } from '@prisma/client';
 import { randomInt } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
 type Tx = Prisma.TransactionClient;
+
+const CANCELLED_BY: Record<'customer' | 'staff' | 'returned', CancelledBy> = { customer: 'CUSTOMER', staff: 'STAFF', returned: 'COURIER' };
 
 // 0/O va 1/I kabi chalkashadigan belgilarsiz: telefonda aytish va qo'lda yozish oson.
 const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -96,7 +98,7 @@ export class OrdersService {
       await tx.stockMovement.createMany({
         data: order.items.map((i) => ({ batchId: i.batchId, type: 'RETURN' as const, qty: i.qty, orderId, userId: actorId })),
       });
-      return tx.order.update({ where: { id: orderId }, data: { status: 'CANCELLED' }, omit: { code: true } });
+      return tx.order.update({ where: { id: orderId }, data: { status: 'CANCELLED', cancelledBy: CANCELLED_BY[mode] }, omit: { code: true } });
     });
   }
 

@@ -7,7 +7,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { useAuthed } from '@/components/useAuthed';
 import { api, setSession } from '@/lib/client';
 import { date, price } from '@/lib/format';
-import { dict, type Locale } from '@/lib/i18n';
+import { dict, orderStatusLabel, type Locale } from '@/lib/i18n';
 import { useShop } from '@/lib/shop';
 
 interface Me {
@@ -21,6 +21,7 @@ interface Me {
 interface Order {
   id: number;
   status: string;
+  cancelledBy: string | null;
   total: number;
   createdAt: string;
   items: { title: string; qty: number }[];
@@ -186,7 +187,7 @@ export default function CabinetPage() {
                   <li key={o.id}>
                     <Link href={`/${locale}/orders/${o.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-slate-100 p-3 hover:border-brand-500">
                       <span className="font-semibold">{date(o.createdAt, locale)}</span>
-                      <StatusBadge status={o.status} label={t.status[o.status]} />
+                      <StatusBadge status={o.status} label={orderStatusLabel(t, o)} />
                       <span className="ml-auto font-semibold">{price(o.total, t.sum)}</span>
                       <span className="w-full truncate text-sm text-slate-500">{o.items.map((i) => `${i.title} × ${i.qty}`).join(', ')}</span>
                     </Link>

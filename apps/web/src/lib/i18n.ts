@@ -64,6 +64,11 @@ const uz = {
     DELIVERED: 'Yetkazildi',
     CANCELLED: 'Bekor qilingan',
   } as Record<string, string>,
+  cancelledBy: {
+    CUSTOMER: 'Siz tomoningizdan bekor qilingan',
+    STAFF: 'Ombor xodimi tomonidan bekor qilingan',
+    COURIER: 'Kuryer tomonidan bekor qilingan',
+  } as Record<string, string>,
   noOrders: "Hali buyurtma yo'q",
   continueShopping: 'Xaridni davom ettirish',
   otcNote: 'Saytda faqat retseptsiz veterinariya mahsulotlari sotiladi.',
@@ -194,6 +199,11 @@ const ru: typeof uz = {
     DELIVERED: 'Доставлен',
     CANCELLED: 'Отменён',
   },
+  cancelledBy: {
+    CUSTOMER: 'Отменён вами',
+    STAFF: 'Отменён сотрудником склада',
+    COURIER: 'Отменён курьером',
+  },
   noOrders: 'Заказов пока нет',
   continueShopping: 'Продолжить покупки',
   otcNote: 'На сайте продаются только безрецептурные ветеринарные товары.',
@@ -262,5 +272,9 @@ const ru: typeof uz = {
 };
 
 export type Dict = typeof uz;
+
+// Bekor qilingan buyurtmada kim bekor qilgani ko'rsatiladi.
+export const orderStatusLabel = (t: Dict, o: { status: string; cancelledBy?: string | null }) =>
+  (o.status === 'CANCELLED' && o.cancelledBy && t.cancelledBy[o.cancelledBy]) || t.status[o.status];
 export const dict = (l: Locale): Dict => (l === 'ru' ? ru : uz);
 export const isLocale = (l: string): l is Locale => (locales as string[]).includes(l);

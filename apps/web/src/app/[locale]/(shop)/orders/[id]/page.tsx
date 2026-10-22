@@ -5,11 +5,12 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { useAuthed } from '@/components/useAuthed';
 import { api } from '@/lib/client';
 import { date, price } from '@/lib/format';
-import { dict, type Locale } from '@/lib/i18n';
+import { dict, orderStatusLabel, type Locale } from '@/lib/i18n';
 
 interface Order {
   id: number;
   status: string;
+  cancelledBy: string | null;
   paymentMethod: string;
   itemsTotal: number;
   deliveryFee: number;
@@ -52,7 +53,7 @@ export default function OrderPage() {
         <h1 className="text-xl font-bold">
           {t.orderNo} · {date(order.createdAt, locale)}
         </h1>
-        <StatusBadge status={order.status} label={t.status[order.status]} />
+        <StatusBadge status={order.status} label={orderStatusLabel(t, order)} />
       </div>
       <section className="card divide-y divide-slate-100">
         {order.items.map((i) => (

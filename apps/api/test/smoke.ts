@@ -104,7 +104,8 @@ async function main() {
   }).then((r) => r.json() as any);
   assert.equal(badAuth.error.code, -32504);
 
-  await call('POST', `/orders/${o2.id}/cancel`, undefined, customer);
+  const cancelled = await call('POST', `/orders/${o2.id}/cancel`, undefined, customer);
+  assert.equal(cancelled.cancelledBy, 'CUSTOMER');
   const restored = (await call('GET', '/products/multivitamin-kompleksi')).variants[0].stock;
   assert.equal(restored, mid + 3);
 

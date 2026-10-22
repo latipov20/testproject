@@ -44,6 +44,13 @@ enum OrderStatus {
   CANCELLED
 }
 
+// Kim bekor qildi: xaridor o'zi, ombor xodimi (admin) yoki kuryer (qaytardi).
+enum CancelledBy {
+  CUSTOMER
+  STAFF
+  COURIER
+}
+
 enum PaymentMethod {
   PAYME
   CLICK
@@ -272,6 +279,7 @@ model Order {
   total         Int
   paymentMethod PaymentMethod
   status        OrderStatus   @default(NEW)
+  cancelledBy   CancelledBy?
   comment       String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
